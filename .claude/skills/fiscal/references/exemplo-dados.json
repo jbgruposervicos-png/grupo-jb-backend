@@ -1,0 +1,104 @@
+{
+  "razao_social": "JB ITABOLOS PANIFICACAO E CONFEITARIA LTDA",
+  "competencia": "05/2026",
+  "competencia_extenso": "MAIO / 2026",
+
+  "receita_mes": 125812.00,
+
+  "faixa": "3ª FAIXA",
+  "limite_faixa": "até R$ 1,8M/ano",
+  "aliquota_efetiva": 5.17,
+
+  "das_total": 6509.95,
+  "vencimento_das": "22/06/2026",
+
+  "compras": 42393.91,
+  "vendas": 125812.00,
+  "resultado_bruto": 83418.09,
+  "margem": 197,
+
+  "comparativo_mes_anterior": {
+    "competencia": "Abr/2026",
+    "valor": 121995.00
+  },
+
+  "comparativo_ano_anterior": {
+    "competencia": "Mai/2025",
+    "valor": 45323.00
+  },
+
+  "notas_faltantes": [
+    {
+      "tipo": "NFC-e nº",
+      "numero": "3794",
+      "serie": "2"
+    }
+  ],
+
+  "tributos": {
+    "irpj": 538.42,
+    "csll": 342.63,
+    "cofins": 1247.17,
+    "pis": 270.19,
+    "cpp": 4111.54,
+    "icms": 0.00
+  },
+
+  "principal": 6509.95,
+  "multa": 0.00,
+  "juros": 0.00,
+
+  "historico_vendas": [
+    {
+      "mes": "Jun/25",
+      "valor": 63186.00
+    },
+    {
+      "mes": "Jul/25",
+      "valor": 37344.00
+    },
+    {
+      "mes": "Ago/25",
+      "valor": 37666.00
+    },
+    {
+      "mes": "Set/25",
+      "valor": 37444.00
+    },
+    {
+      "mes": "Out/25",
+      "valor": 39389.00
+    },
+    {
+      "mes": "Nov/25",
+      "valor": 39142.00
+    },
+    {
+      "mes": "Dez/25",
+      "valor": 62827.00
+    },
+    {
+      "mes": "Jan/26",
+      "valor": 96161.00
+    },
+    {
+      "mes": "Fev/26",
+      "valor": 71781.00
+    },
+    {
+      "mes": "Mar/26",
+      "valor": 118544.00
+    },
+    {
+      "mes": "Abr/26",
+      "valor": 121995.00
+    },
+    {
+      "mes": "Mai/26",
+      "valor": 125812.00,
+      "atual": true
+    }
+  ],
+
+  "alerta_principal": "DAS com vencimento em 22/06/2026 • NFC-e nº 3794 não lançada"
+}
