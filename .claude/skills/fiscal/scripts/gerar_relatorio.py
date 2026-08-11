@@ -15,6 +15,7 @@ AZUL = colors.HexColor("#173F73")
 AZUL_CLARO = colors.HexColor("#DDEAF7")
 AZUL_MEDIO = colors.HexColor("#3166A8")
 LARANJA = colors.HexColor("#F6A91A")
+LARANJA_ESCURO = colors.HexColor("#C77C00")
 LARANJA_CLARO = colors.HexColor("#FFF5D9")
 VERMELHO = colors.HexColor("#C83C32")
 VERMELHO_CLARO = colors.HexColor("#FFF0EE")
@@ -23,6 +24,42 @@ CINZA = colors.HexColor("#6B7280")
 CINZA_CLARO = colors.HexColor("#E5E7EB")
 BRANCO = colors.white
 PRETO = colors.HexColor("#172033")
+
+# Todo o texto usa as fontes base-14 (Helvetica), cujo encoding é o
+# WinAnsi. Símbolos como ▲ ▼ ■ → NÃO existem nesse encoding e quebram o
+# PDF, portanto são desenhados como vetores (ver seção SÍMBOLOS VETORIAIS).
+FONTE = "Helvetica"
+FONTE_BOLD = "Helvetica-Bold"
+
+
+# ============================================================
+# ALTURAS DO LAYOUT (uma única página A4)
+# ============================================================
+
+MARGEM = 14
+
+H_CABECALHO = 56
+H_CARD = 58
+H_COMPARATIVO = 58
+H_ALERTAS = 100
+H_GRAFICO = 264
+H_RESUMO = 72
+H_RODAPE = 48
+
+GAP_CABECALHO = 14
+GAP_CARDS = 8
+GAP_LINHA = 14
+GAP_ALERTAS = 14
+GAP_GRAFICO = 16
+GAP_RESUMO = 18
+GAP_RODAPE = 16
+
+GAP_COLUNAS = 3
+
+
+# ============================================================
+# FORMATAÇÃO
+# ============================================================
 
 
 def moeda(valor):
@@ -36,6 +73,33 @@ def moeda(valor):
     texto = f"{valor:,.2f}"
     texto = texto.replace(",", "X").replace(".", ",").replace("X", ".")
     return f"R$ {texto}"
+
+
+def moeda_curta(valor):
+    """Valor sem centavos, para caber acima das barras do gráfico."""
+    if valor is None or valor == "":
+        return "-"
+    try:
+        valor = float(valor)
+    except (TypeError, ValueError):
+        return str(valor)
+
+    texto = f"{valor:,.0f}".replace(",", ".")
+    return f"R$ {texto}"
+
+
+def moeda_milhar(valor):
+    """Forma ainda mais compacta: R$ 125,8 mil."""
+    try:
+        valor = float(valor)
+    except (TypeError, ValueError):
+        return str(valor)
+
+    if abs(valor) < 1000:
+        return moeda_curta(valor)
+
+    texto = f"{valor / 1000:,.1f}".replace(",", "X").replace(".", ",")
+    return f"R$ {texto.replace('X', '.')} mil"
 
 
 def percentual(valor, casas=2):
@@ -58,13 +122,24 @@ def calcular_variacao(atual, anterior):
     if anterior in (None, 0, "", "0"):
         return None, None
 
-    atual = float(atual)
-    anterior = float(anterior)
+    try:
+        atual = float(atual)
+        anterior = float(anterior)
+    except (TypeError, ValueError):
+        return None, None
+
+    if anterior == 0:
+        return None, None
 
     diferenca = atual - anterior
     percentual_var = (diferenca / anterior) * 100
 
     return percentual_var, diferenca
+
+
+# ============================================================
+# PRIMITIVAS DE DESENHO
+# ============================================================
 
 
 def arredondar_caixa(c, x, y, w, h, preenchimento, borda=None, raio=5):
@@ -73,14 +148,14 @@ def arredondar_caixa(c, x, y, w, h, preenchimento, borda=None, raio=5):
     c.roundRect(x, y, w, h, raio, fill=1, stroke=1)
 
 
-def centralizar(c, texto, x, y, w, fonte="Helvetica-Bold", tamanho=10, cor=PRETO):
+def centralizar(c, texto, x, y, w, fonte=FONTE_BOLD, tamanho=10, cor=PRETO):
     c.setFont(fonte, tamanho)
     c.setFillColor(cor)
     largura = c.stringWidth(texto, fonte, tamanho)
     c.drawString(x + (w - largura) / 2, y, texto)
 
 
-def limitar_texto(c, texto, largura, fonte="Helvetica", tamanho=8):
+def limitar_texto(c, texto, largura, fonte=FONTE, tamanho=8):
     texto = str(texto or "")
     if c.stringWidth(texto, fonte, tamanho) <= largura:
         return texto
@@ -89,6 +164,117 @@ def limitar_texto(c, texto, largura, fonte="Helvetica", tamanho=8):
         texto = texto[:-1]
 
     return texto + "..."
+
+
+def escrever_ajustado(
+    c,
+    texto,
+    x,
+    y,
+    largura,
+    tamanhos,
+    fonte=FONTE,
+    cor=PRETO,
+    ancora="left",
+):
+    """Escreve usando o maior tamanho da lista que couber em `largura`.
+
+    Só recorre a truncamento se nem o menor tamanho couber, de modo que
+    nenhum texto sai cortado sem necessidade.
+    """
+    texto = str(texto or "")
+
+    tamanho = tamanhos[-1]
+    for candidato in tamanhos:
+        if c.stringWidth(texto, fonte, candidato) <= largura:
+            tamanho = candidato
+            break
+    else:
+        texto = limitar_texto(c, texto, largura, fonte, tamanho)
+
+    c.setFont(fonte, tamanho)
+    c.setFillColor(cor)
+
+    if ancora == "center":
+        c.drawString(x + (largura - c.stringWidth(texto, fonte, tamanho)) / 2, y, texto)
+    elif ancora == "right":
+        c.drawString(x + largura - c.stringWidth(texto, fonte, tamanho), y, texto)
+    else:
+        c.drawString(x, y, texto)
+
+    return tamanho
+
+
+# ============================================================
+# SÍMBOLOS VETORIAIS
+# ------------------------------------------------------------
+# Substituem ▲ (U+25B2), ▼ (U+25BC), ■ (U+25A0) e → (U+2192), que não
+# existem no WinAnsiEncoding das fontes base-14 e sairiam quebrados.
+# ============================================================
+
+
+def triangulo(c, x, y, tamanho, para_cima, cor):
+    c.setFillColor(cor)
+    c.setStrokeColor(cor)
+
+    meio = tamanho / 2.0
+    caminho = c.beginPath()
+
+    if para_cima:
+        caminho.moveTo(x + meio, y + tamanho)
+        caminho.lineTo(x, y)
+        caminho.lineTo(x + tamanho, y)
+    else:
+        caminho.moveTo(x + meio, y)
+        caminho.lineTo(x, y + tamanho)
+        caminho.lineTo(x + tamanho, y + tamanho)
+
+    caminho.close()
+    c.drawPath(caminho, fill=1, stroke=0)
+
+
+def quadrado(c, x, y, tamanho, cor):
+    c.setFillColor(cor)
+    c.rect(x, y, tamanho, tamanho, fill=1, stroke=0)
+
+
+def seta_direita(c, x, y, comprimento, cor, espessura=0.7):
+    """Seta horizontal simples, no lugar de '→'."""
+    c.setStrokeColor(cor)
+    c.setFillColor(cor)
+    c.setLineWidth(espessura)
+
+    meio = y + 2
+    c.line(x, meio, x + comprimento - 2.6, meio)
+
+    ponta = c.beginPath()
+    ponta.moveTo(x + comprimento, meio)
+    ponta.lineTo(x + comprimento - 3.2, meio + 1.9)
+    ponta.lineTo(x + comprimento - 3.2, meio - 1.9)
+    ponta.close()
+    c.drawPath(ponta, fill=1, stroke=0)
+
+    c.setLineWidth(1)
+
+
+def titulo_bloco(c, x, y, texto, cor, largura):
+    """Título de bloco precedido por um marcador quadrado vetorial."""
+    quadrado(c, x, y + 0.5, 5, cor)
+    escrever_ajustado(
+        c,
+        texto,
+        x + 9,
+        y,
+        largura - 9,
+        [8.5, 8, 7.5, 7],
+        fonte=FONTE_BOLD,
+        cor=cor,
+    )
+
+
+# ============================================================
+# COMPONENTES
+# ============================================================
 
 
 def card_indicador(
@@ -102,543 +288,721 @@ def card_indicador(
     subtitulo=None,
     fundo=AZUL_CLARO,
     cor_valor=AZUL,
+    cor_titulo=AZUL,
 ):
     arredondar_caixa(c, x, y, w, h, fundo, AZUL_MEDIO)
 
-    centralizar(
+    interno = w - 12
+
+    escrever_ajustado(
         c,
         titulo.upper(),
-        x,
-        y + h - 13,
-        w,
-        tamanho=7,
-        cor=AZUL,
+        x + 6,
+        y + h - 15,
+        interno,
+        [8, 7.5, 7, 6.5],
+        fonte=FONTE_BOLD,
+        cor=cor_titulo,
+        ancora="center",
     )
 
-    centralizar(
+    escrever_ajustado(
         c,
         texto_seguro(valor),
-        x,
-        y + h / 2 - 3,
-        w,
-        tamanho=11,
+        x + 6,
+        y + h / 2 - 6,
+        interno,
+        [13, 12, 11, 10, 9],
+        fonte=FONTE_BOLD,
         cor=cor_valor,
+        ancora="center",
     )
 
     if subtitulo:
-        centralizar(
+        escrever_ajustado(
             c,
             texto_seguro(subtitulo),
-            x,
-            y + 7,
-            w,
-            fonte="Helvetica",
-            tamanho=6.5,
-            cor=CINZA,
+            x + 6,
+            y + 9,
+            interno,
+            [7.5, 7, 6.5],
+            fonte=FONTE,
+            cor=CINZA if fundo is AZUL_CLARO else CINZA_CLARO,
+            ancora="center",
         )
 
 
 def card_comparacao(c, x, y, w, h, titulo, competencia, anterior, atual):
+    """Card de comparação.
+
+    A competência aparece UMA única vez (na linha de referência); o título
+    descreve apenas o tipo de comparação.
+    """
     arredondar_caixa(c, x, y, w, h, AZUL_CLARO, AZUL_MEDIO)
-
-    c.setFillColor(AZUL)
-    c.setFont("Helvetica-Bold", 7)
-    c.drawString(x + 8, y + h - 12, titulo.upper())
-
-    c.setFont("Helvetica", 7)
-    c.setFillColor(CINZA)
-    c.drawString(x + 8, y + h - 24, texto_seguro(competencia))
-
-    c.setFont("Helvetica-Bold", 8)
-    c.setFillColor(AZUL)
-    c.drawString(x + 8, y + h - 36, moeda(anterior))
 
     variacao, diferenca = calcular_variacao(atual, anterior)
 
-    if variacao is not None:
-        cor = VERDE if variacao >= 0 else VERMELHO
-        seta = "▲" if variacao >= 0 else "▼"
-        verbo = "Subiu" if diferenca >= 0 else "Caiu"
+    # Reserva a metade direita para o indicador de variação.
+    largura_titulo = w - 16
+    largura_esquerda = (w * 0.55) - 16
 
-        c.setFillColor(cor)
-        c.setFont("Helvetica-Bold", 10)
-        c.drawRightString(
-            x + w - 8,
-            y + h - 24,
-            f"{seta} {percentual(abs(variacao), 1)}",
-        )
+    escrever_ajustado(
+        c,
+        titulo.upper(),
+        x + 8,
+        y + h - 15,
+        largura_titulo,
+        [8, 7.5, 7],
+        fonte=FONTE_BOLD,
+        cor=AZUL,
+    )
 
-        c.setFont("Helvetica", 7)
-        c.drawRightString(
-            x + w - 8,
-            y + 8,
-            f"{verbo} {moeda(abs(diferenca))}",
-        )
+    escrever_ajustado(
+        c,
+        texto_seguro(competencia),
+        x + 8,
+        y + h - 30,
+        largura_esquerda,
+        [8, 7.5, 7],
+        fonte=FONTE,
+        cor=CINZA,
+    )
 
+    escrever_ajustado(
+        c,
+        moeda(anterior),
+        x + 8,
+        y + 12,
+        largura_esquerda,
+        [11, 10, 9],
+        fonte=FONTE_BOLD,
+        cor=AZUL,
+    )
 
-def desenhar_grafico_vendas(c, x, y, w, h, historico):
-    c.setFillColor(AZUL)
-    c.setFont("Helvetica-Bold", 9)
-    c.drawCentredString(x + w / 2, y + h + 13, "Vendas Mensais")
-
-    if not historico:
-        c.setFillColor(CINZA)
-        c.setFont("Helvetica", 8)
-        c.drawCentredString(
+    if variacao is None:
+        escrever_ajustado(
+            c,
+            "sem histórico comparável",
             x + w / 2,
-            y + h / 2,
-            "Histórico mensal não disponível",
+            y + 12,
+            w / 2 - 8,
+            [8, 7.5, 7],
+            fonte=FONTE,
+            cor=CINZA,
+            ancora="right",
         )
         return
 
+    subiu = diferenca >= 0
+    cor = VERDE if subiu else VERMELHO
+
+    rotulo = percentual(abs(variacao), 1)
+    tamanho = 12
+    largura_rotulo = c.stringWidth(rotulo, FONTE_BOLD, tamanho)
+
+    base_y = y + h - 32
+    triangulo(c, x + w - 8 - largura_rotulo - 11, base_y + 1, 8, subiu, cor)
+
+    c.setFont(FONTE_BOLD, tamanho)
+    c.setFillColor(cor)
+    c.drawRightString(x + w - 8, base_y, rotulo)
+
+    escrever_ajustado(
+        c,
+        f"{'Subiu' if subiu else 'Caiu'} {moeda(abs(diferenca))}",
+        x + w / 2,
+        y + 12,
+        w / 2 - 8,
+        [8.5, 8, 7.5],
+        fonte=FONTE,
+        cor=cor,
+        ancora="right",
+    )
+
+
+# ============================================================
+# GRÁFICO DE VENDAS
+# ============================================================
+
+
+def desenhar_grafico_vendas(c, x, y, w, h, historico):
+    """Desenha o bloco do gráfico dentro do retângulo (x, y, w, h)."""
+    arredondar_caixa(c, x, y, w, h, BRANCO, CINZA_CLARO)
+
+    centralizar(
+        c,
+        "VENDAS MENSAIS",
+        x,
+        y + h - 17,
+        w,
+        fonte=FONTE_BOLD,
+        tamanho=10,
+        cor=AZUL,
+    )
+
+    if not historico:
+        centralizar(
+            c,
+            "Histórico mensal não disponível",
+            x,
+            y + h / 2,
+            w,
+            fonte=FONTE,
+            tamanho=9,
+            cor=CINZA,
+        )
+        return
+
+    # Área útil do plot
+    plot_x = x + 16
+    plot_w = w - 32
+    eixo_y = y + 30
+    altura_max = (y + h - 34) - eixo_y - 14
+
     valores = [float(item.get("valor", 0) or 0) for item in historico]
-
     maior = max(valores) if valores else 0
-
     if maior <= 0:
         maior = 1
 
-    espaco = 5
     qtd = len(historico)
-    barra_w = max(12, (w - espaco * (qtd - 1)) / qtd)
+    espaco = 5 if qtd <= 14 else 3
+    barra_w = max(6, (plot_w - espaco * (qtd - 1)) / qtd)
 
-    # Linha base
+    def altura_de(valor):
+        return (valor / maior) * altura_max
+
+    # --- linhas de grade ---
     c.setStrokeColor(CINZA_CLARO)
-    c.line(x, y, x + w, y)
+    c.setLineWidth(0.4)
+    for fracao in (0.25, 0.5, 0.75, 1.0):
+        gy = eixo_y + altura_max * fracao
+        c.line(plot_x, gy, plot_x + plot_w, gy)
 
-    # Média
-    media = sum(valores) / len(valores)
-    media_y = y + (media / maior) * h
+    # --- linha base ---
+    c.setStrokeColor(CINZA)
+    c.setLineWidth(0.7)
+    c.line(plot_x, eixo_y, plot_x + plot_w, eixo_y)
 
-    c.setStrokeColor(VERMELHO)
-    c.setDash(4, 3)
-    c.line(x, media_y, x + w, media_y)
-    c.setDash()
-
-    c.setFillColor(VERMELHO)
-    c.setFont("Helvetica", 5.5)
-    c.drawRightString(x + w, media_y + 2, f"Média {moeda(media)}")
-
+    # --- barras ---
+    posicoes = []
     for i, item in enumerate(historico):
         valor = float(item.get("valor", 0) or 0)
-        altura = (valor / maior) * (h - 15)
-
-        bx = x + i * (barra_w + espaco)
+        altura = altura_de(valor)
+        bx = plot_x + i * (barra_w + espaco)
+        posicoes.append(bx)
 
         atual = bool(item.get("atual", False))
-        cor = LARANJA if atual else AZUL_MEDIO
 
-        c.setFillColor(cor)
-        c.rect(bx, y, barra_w, altura, fill=1, stroke=0)
+        c.setFillColor(LARANJA if atual else AZUL_MEDIO)
+        c.rect(bx, eixo_y, barra_w, altura, fill=1, stroke=0)
 
-        c.setFillColor(CINZA)
-        c.setFont("Helvetica", 5.3)
-        c.drawCentredString(
-            bx + barra_w / 2,
-            y - 8,
+        escrever_ajustado(
+            c,
             texto_seguro(item.get("mes")),
+            bx,
+            eixo_y - 13,
+            barra_w,
+            [7.5, 7, 6.5, 6],
+            fonte=FONTE,
+            cor=CINZA,
+            ancora="center",
         )
 
-        c.setFillColor(PRETO)
-        c.setFont("Helvetica", 4.7)
-        c.drawCentredString(
-            bx + barra_w / 2,
-            y + altura + 3,
-            moeda(valor),
+        # Valor acima da barra: tenta a forma completa e, se não couber na
+        # largura da barra, recorre à forma em milhares.
+        rotulo = moeda_curta(valor)
+        if c.stringWidth(rotulo, FONTE_BOLD, 7) > barra_w:
+            rotulo = moeda_milhar(valor)
+
+        escrever_ajustado(
+            c,
+            rotulo,
+            bx,
+            eixo_y + altura + 4,
+            barra_w,
+            [7.5, 7, 6.5, 6],
+            fonte=FONTE_BOLD,
+            cor=PRETO if atual else CINZA,
+            ancora="center",
         )
+
+    # --- média (mesma escala vertical das barras) ---
+    media = sum(valores) / len(valores)
+    media_y = eixo_y + altura_de(media)
+
+    c.setStrokeColor(VERMELHO)
+    c.setLineWidth(0.9)
+    c.setDash(4, 3)
+    c.line(plot_x, media_y, plot_x + plot_w, media_y)
+    c.setDash()
+    c.setLineWidth(1)
+
+    # Rótulo da média: posicionado sobre um trecho em que nenhuma barra
+    # alcança a linha, e desenhado DEPOIS das barras para nunca ficar
+    # escondido atrás delas.
+    rotulo = f"Média {moeda_curta(media)}"
+    tam = 7.5
+    largura_rotulo = c.stringWidth(rotulo, FONTE_BOLD, tam) + 8
+    altura_rotulo = 11
+
+    destino = None
+    for i, valor in enumerate(valores):
+        if eixo_y + altura_de(valor) < media_y - 3:
+            destino = posicoes[i]
+            break
+
+    if destino is None:
+        # Nenhum vão livre: coloca acima da barra mais alta.
+        rotulo_y = eixo_y + altura_max + 2
+        destino = plot_x
+    else:
+        rotulo_y = media_y + 3
+
+    destino = min(max(destino, plot_x), plot_x + plot_w - largura_rotulo)
+
+    c.setFillColor(BRANCO)
+    c.setStrokeColor(VERMELHO)
+    c.setLineWidth(0.5)
+    c.roundRect(destino, rotulo_y, largura_rotulo, altura_rotulo, 2.5, fill=1, stroke=1)
+    c.setLineWidth(1)
+
+    centralizar(
+        c,
+        rotulo,
+        destino,
+        rotulo_y + 3,
+        largura_rotulo,
+        fonte=FONTE_BOLD,
+        tamanho=tam,
+        cor=VERMELHO,
+    )
+
+
+# ============================================================
+# BLOCOS DE NOTAS E DAS
+# ============================================================
+
+
+def bloco_notas(c, x, y, w, h, competencia, notas):
+    arredondar_caixa(c, x, y, w, h, LARANJA_CLARO, LARANJA)
+
+    titulo_bloco(
+        c,
+        x + 8,
+        y + h - 16,
+        f"NOTAS NÃO LANÇADAS — {texto_seguro(competencia).upper()}",
+        LARANJA_ESCURO,
+        w - 16,
+    )
+
+    notas = notas or []
+
+    if not notas:
+        escrever_ajustado(
+            c,
+            "Nenhuma nota faltante informada.",
+            x + 8,
+            y + h - 33,
+            w - 16,
+            [8, 7.5],
+            fonte=FONTE,
+            cor=CINZA,
+        )
+        return
+
+    passo = 13
+    topo = y + h - 33
+    base = y + 10
+
+    # Quantas linhas cabem de fato no bloco.
+    cabem = max(1, int((topo - base) // passo) + 1)
+
+    # Se sobrar nota de fora, a última linha vira o aviso de quantidade.
+    if len(notas) > cabem:
+        exibidas = cabem - 1
+    else:
+        exibidas = len(notas)
+
+    linha_y = topo
+
+    for nota in notas[:exibidas]:
+        descricao = " ".join(
+            parte
+            for parte in (
+                texto_seguro(nota.get("tipo"), ""),
+                texto_seguro(nota.get("numero"), ""),
+                (
+                    f"Série {texto_seguro(nota.get('serie'))}"
+                    if nota.get("serie") not in (None, "")
+                    else ""
+                ),
+            )
+            if parte
+        )
+
+        escrever_ajustado(
+            c,
+            descricao,
+            x + 8,
+            linha_y,
+            w - 16,
+            [8, 7.5, 7],
+            fonte=FONTE,
+            cor=PRETO,
+        )
+        linha_y -= passo
+
+    restantes = len(notas) - exibidas
+    if restantes > 0:
+        escrever_ajustado(
+            c,
+            f"+ {restantes} outra{'s' if restantes > 1 else ''} nota"
+            f"{'s' if restantes > 1 else ''} não lançada"
+            f"{'s' if restantes > 1 else ''} "
+            f"({len(notas)} no total)",
+            x + 8,
+            linha_y,
+            w - 16,
+            [8, 7.5, 7],
+            fonte=FONTE_BOLD,
+            cor=LARANJA_ESCURO,
+        )
+
+
+def bloco_das(c, x, y, w, h, dados, impostos):
+    arredondar_caixa(c, x, y, w, h, VERMELHO_CLARO, VERMELHO)
+
+    titulo_bloco(
+        c,
+        x + 8,
+        y + h - 16,
+        f"DETALHAMENTO DO DAS — {moeda(dados.get('das_total'))}",
+        VERMELHO,
+        w - 16,
+    )
+
+    linhas = [
+        f"IRPJ {moeda(impostos.get('irpj'))}   •   CSLL {moeda(impostos.get('csll'))}",
+        f"COFINS {moeda(impostos.get('cofins'))}   •   PIS {moeda(impostos.get('pis'))}",
+        f"INSS/CPP {moeda(impostos.get('cpp'))}   •   ICMS {moeda(impostos.get('icms'))}",
+    ]
+
+    # Principal/multa/juros numa linha só quando couber, para não deixar o
+    # bloco alto demais; caso contrário, quebra em duas.
+    encargos = (
+        f"Principal {moeda(dados.get('principal'))}   •   "
+        f"Multa {moeda(dados.get('multa'))}   •   "
+        f"Juros {moeda(dados.get('juros'))}"
+    )
+
+    if c.stringWidth(encargos, FONTE, 7.5) <= w - 16:
+        linhas.append(encargos)
+    else:
+        linhas.append(f"Principal {moeda(dados.get('principal'))}")
+        linhas.append(
+            f"Multa {moeda(dados.get('multa'))}   •   "
+            f"Juros {moeda(dados.get('juros'))}"
+        )
+
+    passo = 13
+    linha_y = y + h - 33
+
+    for linha in linhas:
+        if linha_y < y + 8:
+            break
+        escrever_ajustado(
+            c,
+            linha,
+            x + 8,
+            linha_y,
+            w - 16,
+            [8, 7.5, 7, 6.5],
+            fonte=FONTE,
+            cor=PRETO,
+        )
+        linha_y -= passo
+
+
+# ============================================================
+# RELATÓRIO
+# ============================================================
 
 
 def gerar_pdf(dados, arquivo_saida):
     c = canvas.Canvas(str(arquivo_saida), pagesize=A4)
 
     largura, altura = A4
+    area_w = largura - MARGEM * 2
 
-    margem = 14
-    area_w = largura - margem * 2
+    card_w = (area_w - GAP_COLUNAS * 3) / 4
+    meia_w = (area_w - GAP_COLUNAS) / 2
 
     # ========================================================
     # CABEÇALHO
     # ========================================================
 
-    header_h = 47
-    header_y = altura - margem - header_h
+    y = altura - MARGEM - H_CABECALHO
 
-    arredondar_caixa(
-        c,
-        margem,
-        header_y,
-        area_w,
-        header_h,
-        AZUL,
-        AZUL,
-        raio=6,
-    )
+    arredondar_caixa(c, MARGEM, y, area_w, H_CABECALHO, AZUL, AZUL, raio=6)
 
-    # Logo JB
-    logo_x = margem + 10
-    logo_y = header_y + 8
+    logo_x = MARGEM + 10
+    logo_y = y + 8
 
     c.setFillColor(LARANJA)
-    c.roundRect(logo_x, logo_y, 38, 31, 3, fill=1, stroke=0)
+    c.roundRect(logo_x, logo_y, 44, H_CABECALHO - 16, 3, fill=1, stroke=0)
 
-    c.setFillColor(BRANCO)
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(logo_x + 6, logo_y + 11, "JB")
-
-    razao_social = texto_seguro(dados.get("razao_social"))
-    competencia_extenso = texto_seguro(
-        dados.get("competencia_extenso"),
-        dados.get("competencia", "-"),
-    )
-
-    c.setFillColor(BRANCO)
-    c.setFont("Helvetica-Bold", 13)
-
-    empresa_exibicao = limitar_texto(
+    centralizar(
         c,
-        razao_social.upper(),
-        area_w - 70,
-        "Helvetica-Bold",
-        13,
+        "JB",
+        logo_x,
+        logo_y + (H_CABECALHO - 16) / 2 - 4,
+        44,
+        fonte=FONTE_BOLD,
+        tamanho=13,
+        cor=BRANCO,
     )
 
-    c.drawString(margem + 60, header_y + 27, empresa_exibicao)
+    texto_x = logo_x + 54
+    texto_w = largura - MARGEM - 10 - texto_x
 
-    c.setFont("Helvetica", 8)
-    c.drawString(margem + 60, header_y + 13, competencia_extenso.upper())
+    escrever_ajustado(
+        c,
+        texto_seguro(dados.get("razao_social")).upper(),
+        texto_x,
+        y + 31,
+        texto_w,
+        [14, 13, 12, 11, 10],
+        fonte=FONTE_BOLD,
+        cor=BRANCO,
+    )
+
+    escrever_ajustado(
+        c,
+        texto_seguro(
+            dados.get("competencia_extenso"),
+            dados.get("competencia", "-"),
+        ).upper(),
+        texto_x,
+        y + 15,
+        texto_w,
+        [9.5, 9, 8.5],
+        fonte=FONTE,
+        cor=AZUL_CLARO,
+    )
 
     # ========================================================
-    # PRIMEIRA LINHA
+    # PRIMEIRA LINHA DE INDICADORES
     # ========================================================
 
-    gap = 3
-    card_w = (area_w - gap * 3) / 4
-    card_h = 49
-
-    y = header_y - 22 - card_h
+    y -= GAP_CABECALHO + H_CARD
 
     card_indicador(
-        c,
-        margem,
-        y,
-        card_w,
-        card_h,
-        "Receita do mês",
-        moeda(dados.get("receita_mes")),
+        c, MARGEM, y, card_w, H_CARD,
+        "Receita do mês", moeda(dados.get("receita_mes")),
     )
 
     card_indicador(
-        c,
-        margem + card_w + gap,
-        y,
-        card_w,
-        card_h,
-        "Faixa",
-        texto_seguro(dados.get("faixa")),
+        c, MARGEM + card_w + GAP_COLUNAS, y, card_w, H_CARD,
+        "Faixa", texto_seguro(dados.get("faixa")),
         texto_seguro(dados.get("limite_faixa"), ""),
     )
 
     card_indicador(
-        c,
-        margem + (card_w + gap) * 2,
-        y,
-        card_w,
-        card_h,
-        "Alíquota efetiva",
-        percentual(dados.get("aliquota_efetiva")),
+        c, MARGEM + (card_w + GAP_COLUNAS) * 2, y, card_w, H_CARD,
+        "Alíquota efetiva", percentual(dados.get("aliquota_efetiva")),
     )
 
     card_indicador(
-        c,
-        margem + (card_w + gap) * 3,
-        y,
-        card_w,
-        card_h,
-        "DAS a pagar",
-        moeda(dados.get("das_total")),
+        c, MARGEM + (card_w + GAP_COLUNAS) * 3, y, card_w, H_CARD,
+        "DAS a pagar", moeda(dados.get("das_total")),
         f"Vence {texto_seguro(dados.get('vencimento_das'))}",
     )
 
     # ========================================================
-    # SEGUNDA LINHA
+    # SEGUNDA LINHA DE INDICADORES
     # ========================================================
 
     compras = float(dados.get("compras") or 0)
     vendas = float(dados.get("vendas") or dados.get("receita_mes") or 0)
 
     resultado = dados.get("resultado_bruto")
-
     if resultado is None:
         resultado = vendas - compras
 
+    # Metodologia do modelo oficial:
+    #   Resultado bruto = Vendas - Compras
+    #   Margem = Resultado bruto / Compras * 100
     margem_pct = dados.get("margem")
-
     if margem_pct is None and compras:
         margem_pct = (float(resultado) / compras) * 100
 
-    y -= 56
+    y -= GAP_CARDS + H_CARD
 
-    card_indicador(
-        c,
-        margem,
-        y,
-        card_w,
-        card_h,
-        "Entradas (Compras)",
-        moeda(compras),
-        fundo=AZUL,
-        cor_valor=BRANCO,
-    )
-
-    card_indicador(
-        c,
-        margem + card_w + gap,
-        y,
-        card_w,
-        card_h,
-        "Saídas (Vendas)",
-        moeda(vendas),
-        fundo=AZUL,
-        cor_valor=BRANCO,
-    )
-
-    card_indicador(
-        c,
-        margem + (card_w + gap) * 2,
-        y,
-        card_w,
-        card_h,
-        "Resultado bruto",
-        moeda(resultado),
-        fundo=AZUL,
-        cor_valor=BRANCO,
-    )
-
-    card_indicador(
-        c,
-        margem + (card_w + gap) * 3,
-        y,
-        card_w,
-        card_h,
-        "Margem",
-        percentual(margem_pct, 0),
-        fundo=AZUL,
-        cor_valor=BRANCO,
-    )
+    for indice, (titulo, valor) in enumerate(
+        (
+            ("Entradas (Compras)", moeda(compras)),
+            ("Saídas (Vendas)", moeda(vendas)),
+            ("Resultado bruto", moeda(resultado)),
+            ("Margem", percentual(margem_pct, 0)),
+        )
+    ):
+        card_indicador(
+            c,
+            MARGEM + (card_w + GAP_COLUNAS) * indice,
+            y,
+            card_w,
+            H_CARD,
+            titulo,
+            valor,
+            fundo=AZUL,
+            cor_valor=BRANCO,
+            cor_titulo=AZUL_CLARO,
+        )
 
     # ========================================================
     # COMPARATIVOS
     # ========================================================
 
-    y -= 60
+    anterior = dados.get("comparativo_mes_anterior") or {}
+    anual = dados.get("comparativo_ano_anterior") or {}
 
-    comp_w = (area_w - gap) / 2
-    comp_h = 46
-
-    anterior = dados.get("comparativo_mes_anterior", {})
+    y -= GAP_LINHA + H_COMPARATIVO
 
     card_comparacao(
-        c,
-        margem,
-        y,
-        comp_w,
-        comp_h,
-        f"Comparação de vendas do mês anterior ({texto_seguro(anterior.get('competencia'))})",
-        texto_seguro(anterior.get("competencia")),
+        c, MARGEM, y, meia_w, H_COMPARATIVO,
+        "Comparação com o mês anterior",
+        anterior.get("competencia"),
         anterior.get("valor"),
         vendas,
     )
 
-    anual = dados.get("comparativo_ano_anterior", {})
-
     card_comparacao(
-        c,
-        margem + comp_w + gap,
-        y,
-        comp_w,
-        comp_h,
-        f"Comparação de vendas {texto_seguro(anual.get('competencia'))}",
-        texto_seguro(anual.get("competencia")),
+        c, MARGEM + meia_w + GAP_COLUNAS, y, meia_w, H_COMPARATIVO,
+        "Comparação com o mesmo mês do ano anterior",
+        anual.get("competencia"),
         anual.get("valor"),
         vendas,
     )
 
     # ========================================================
-    # ALERTAS + DAS
+    # NOTAS NÃO LANÇADAS + DETALHAMENTO DO DAS
     # ========================================================
 
-    y -= 71
-    box_h = 78
+    impostos = dados.get("tributos") or {}
 
-    box_w = (area_w - gap) / 2
+    y -= GAP_ALERTAS + H_ALERTAS
 
-    # Notas faltantes
-    arredondar_caixa(
-        c,
-        margem,
-        y,
-        box_w,
-        box_h,
-        LARANJA_CLARO,
-        LARANJA,
+    bloco_notas(
+        c, MARGEM, y, meia_w, H_ALERTAS,
+        dados.get("competencia"),
+        dados.get("notas_faltantes"),
     )
 
-    c.setFillColor(colors.HexColor("#C77C00"))
-    c.setFont("Helvetica-Bold", 8)
-    c.drawString(
-        margem + 8,
-        y + box_h - 13,
-        f"■ NOTAS NÃO LANÇADAS — {texto_seguro(dados.get('competencia')).upper()}",
+    bloco_das(
+        c, MARGEM + meia_w + GAP_COLUNAS, y, meia_w, H_ALERTAS,
+        dados, impostos,
     )
-
-    notas = dados.get("notas_faltantes") or []
-
-    linha_y = y + box_h - 27
-
-    if notas:
-        for nota in notas[:4]:
-            descricao = (
-                f"{texto_seguro(nota.get('tipo'))} "
-                f"{texto_seguro(nota.get('numero'))} "
-                f"Série {texto_seguro(nota.get('serie'))}"
-            )
-
-            c.setFillColor(PRETO)
-            c.setFont("Helvetica", 6.5)
-            c.drawString(
-                margem + 8,
-                linha_y,
-                limitar_texto(c, descricao, box_w - 18, tamanho=6.5),
-            )
-
-            linha_y -= 11
-    else:
-        c.setFillColor(CINZA)
-        c.setFont("Helvetica", 7)
-        c.drawString(margem + 8, linha_y, "Nenhuma nota faltante informada.")
-
-    # Detalhamento DAS
-    das_x = margem + box_w + gap
-
-    arredondar_caixa(
-        c,
-        das_x,
-        y,
-        box_w,
-        box_h,
-        VERMELHO_CLARO,
-        VERMELHO,
-    )
-
-    c.setFillColor(VERMELHO)
-    c.setFont("Helvetica-Bold", 8)
-    c.drawString(
-        das_x + 8,
-        y + box_h - 13,
-        f"■ DETALHAMENTO DO DAS — {moeda(dados.get('das_total'))}",
-    )
-
-    impostos = dados.get("tributos", {})
-
-    linhas_impostos = [
-        f"IRPJ {moeda(impostos.get('irpj'))}   •   CSLL {moeda(impostos.get('csll'))}",
-        f"COFINS {moeda(impostos.get('cofins'))}   •   PIS {moeda(impostos.get('pis'))}",
-        f"INSS/CPP {moeda(impostos.get('cpp'))}   •   ICMS {moeda(impostos.get('icms'))}",
-        (
-            f"Principal {moeda(dados.get('principal'))}   •   "
-            f"Multa {moeda(dados.get('multa'))}   •   "
-            f"Juros {moeda(dados.get('juros'))}"
-        ),
-    ]
-
-    linha_y = y + box_h - 28
-
-    for linha in linhas_impostos:
-        c.setFillColor(PRETO)
-        c.setFont("Helvetica", 6.2)
-        c.drawString(
-            das_x + 8,
-            linha_y,
-            limitar_texto(c, linha, box_w - 16, tamanho=6.2),
-        )
-        linha_y -= 11
 
     # ========================================================
     # GRÁFICO
     # ========================================================
 
-    y -= 160
-
-    historico = dados.get("historico_vendas", [])
+    y -= GAP_GRAFICO + H_GRAFICO
 
     desenhar_grafico_vendas(
-        c,
-        margem + 8,
-        y + 12,
-        area_w - 16,
-        105,
-        historico,
+        c, MARGEM, y, area_w, H_GRAFICO,
+        dados.get("historico_vendas", []),
     )
 
     # ========================================================
-    # COMPARATIVO INFERIOR
+    # COMPARATIVO DE VENDAS
     # ========================================================
 
-    comparativo_y = 64
-    comparativo_h = 61
+    y -= GAP_RESUMO + H_RESUMO
 
-    arredondar_caixa(
-        c,
-        margem,
-        comparativo_y,
-        area_w,
-        comparativo_h,
-        AZUL_CLARO,
-        AZUL_MEDIO,
-    )
+    arredondar_caixa(c, MARGEM, y, area_w, H_RESUMO, AZUL_CLARO, AZUL_MEDIO)
 
     centralizar(
         c,
-        "Comparativo de Vendas",
-        margem,
-        comparativo_y + comparativo_h - 14,
+        "COMPARATIVO DE VENDAS",
+        MARGEM,
+        y + H_RESUMO - 17,
         area_w,
-        tamanho=9,
+        fonte=FONTE_BOLD,
+        tamanho=10,
         cor=AZUL,
     )
 
-    c.setFont("Helvetica", 6.5)
-    c.setFillColor(CINZA)
+    linhas_resumo = [
+        (texto_seguro(anterior.get("competencia")), anterior.get("valor")),
+        (texto_seguro(anual.get("competencia")), anual.get("valor")),
+    ]
 
-    linha1 = (
-        f"vs. {texto_seguro(anterior.get('competencia'))}: "
-        f"{moeda(anterior.get('valor'))}  →  {moeda(vendas)}"
-    )
+    linha_y = y + H_RESUMO - 38
 
-    linha2 = (
-        f"vs. {texto_seguro(anual.get('competencia'))}: "
-        f"{moeda(anual.get('valor'))}  →  {moeda(vendas)}"
-    )
+    for competencia, valor in linhas_resumo:
+        c.setFont(FONTE, 8.5)
+        c.setFillColor(CINZA)
 
-    c.drawString(margem + 12, comparativo_y + 30, linha1)
-    c.drawString(margem + 12, comparativo_y + 15, linha2)
+        rotulo = f"vs. {competencia}:"
+        c.drawString(MARGEM + 14, linha_y, rotulo)
+
+        valor_x = MARGEM + 14 + 92
+
+        c.setFont(FONTE_BOLD, 8.5)
+        c.setFillColor(AZUL)
+        c.drawString(valor_x, linha_y, moeda(valor))
+
+        seta_x = valor_x + 86
+        seta_direita(c, seta_x, linha_y, 16, CINZA)
+
+        c.setFont(FONTE_BOLD, 8.5)
+        c.setFillColor(AZUL)
+        c.drawString(seta_x + 24, linha_y, moeda(vendas))
+
+        variacao, diferenca = calcular_variacao(vendas, valor)
+        if variacao is not None:
+            subiu = diferenca >= 0
+            cor = VERDE if subiu else VERMELHO
+            rotulo_var = percentual(abs(variacao), 1)
+            largura_var = c.stringWidth(rotulo_var, FONTE_BOLD, 8.5)
+
+            triangulo(
+                c,
+                MARGEM + area_w - 14 - largura_var - 10,
+                linha_y + 0.5,
+                7,
+                subiu,
+                cor,
+            )
+
+            c.setFont(FONTE_BOLD, 8.5)
+            c.setFillColor(cor)
+            c.drawRightString(MARGEM + area_w - 14, linha_y, rotulo_var)
+
+        linha_y -= 20
 
     # ========================================================
-    # RODAPÉ / ALERTA
+    # RODAPÉ
     # ========================================================
+
+    y -= GAP_RODAPE
 
     alerta = texto_seguro(
         dados.get("alerta_principal"),
         f"DAS com vencimento em {texto_seguro(dados.get('vencimento_das'))}",
     )
 
-    c.setFillColor(VERMELHO)
-    c.setFont("Helvetica-Bold", 6.5)
-
-    c.drawCentredString(
-        largura / 2,
-        43,
-        limitar_texto(c, alerta, area_w - 20, "Helvetica-Bold", 6.5),
+    escrever_ajustado(
+        c,
+        alerta,
+        MARGEM,
+        y - 10,
+        area_w,
+        [9, 8.5, 8, 7.5],
+        fonte=FONTE_BOLD,
+        cor=VERMELHO,
+        ancora="center",
     )
 
     rodape = (
@@ -651,19 +1015,28 @@ def gerar_pdf(dados, arquivo_saida):
         f"ICMS {moeda(impostos.get('icms'))}"
     )
 
-    c.setFillColor(CINZA)
-    c.setFont("Helvetica", 5.3)
-    c.drawCentredString(
-        largura / 2,
-        31,
-        limitar_texto(c, rodape, area_w - 10, tamanho=5.3),
+    escrever_ajustado(
+        c,
+        rodape,
+        MARGEM,
+        y - 25,
+        area_w,
+        [7.5, 7, 6.5, 6],
+        fonte=FONTE,
+        cor=CINZA,
+        ancora="center",
     )
 
-    c.setFont("Helvetica", 5)
-    c.drawCentredString(
-        largura / 2,
-        19,
+    escrever_ajustado(
+        c,
         "Gerado automaticamente • Base: PGDAS-D + DAS + Controle Fiscal • Grupo JB",
+        MARGEM,
+        y - 38,
+        area_w,
+        [7, 6.5, 6],
+        fonte=FONTE,
+        cor=CINZA,
+        ancora="center",
     )
 
     c.save()
