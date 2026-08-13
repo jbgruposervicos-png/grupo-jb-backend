@@ -1,5 +1,6 @@
 import json
 import sys
+import unicodedata
 from pathlib import Path
 
 from reportlab.lib import colors
@@ -116,6 +117,32 @@ def texto_seguro(valor, padrao="-"):
     if valor is None or valor == "":
         return padrao
     return str(valor)
+
+
+def natureza_empresa(dados):
+    """Natureza da empresa conforme a planilha permanente: serviço ou comércio.
+
+    A natureza NUNCA é deduzida da ausência ou do valor zerado de compras —
+    ela vem exclusivamente do campo informado no JSON, que por sua vez é
+    lido da planilha (ver seção 7A do SKILL.md).
+
+    Aceita variações de caixa e acentuação ("SERVIÇO", "servico",
+    "Prestação de Serviços"). Qualquer valor não reconhecido — inclusive a
+    ausência do campo — mantém o comportamento histórico de COMÉRCIO, com o
+    layout completo de Compras/Resultado/Margem.
+    """
+    bruto = dados.get("natureza")
+    if bruto in (None, ""):
+        bruto = dados.get("natureza_empresa")
+
+    texto = str(bruto or "").strip().lower()
+    texto = (
+        unicodedata.normalize("NFKD", texto)
+        .encode("ascii", "ignore")
+        .decode("ascii")
+    )
+
+    return "servico" if "servic" in texto else "comercio"
 
 
 def calcular_variacao(atual, anterior):
@@ -740,6 +767,10 @@ def gerar_pdf(dados, arquivo_saida):
     card_w = (area_w - GAP_COLUNAS * 3) / 4
     meia_w = (area_w - GAP_COLUNAS) / 2
 
+    # A natureza vem da planilha permanente (campo "natureza" do JSON) e
+    # define qual dos dois layouts será renderizado.
+    servico = natureza_empresa(dados) == "servico"
+
     # ========================================================
     # CABEÇALHO
     # ========================================================
@@ -825,14 +856,26 @@ def gerar_pdf(dados, arquivo_saida):
     # SEGUNDA LINHA DE INDICADORES
     # ========================================================
 
-    compras_raw = dados.get("compras")
-    compras_aplicavel = compras_raw is not None and compras_raw != ""
-    compras = float(compras_raw) if compras_aplicavel else 0.0
     vendas = float(dados.get("vendas") or dados.get("receita_mes") or 0)
 
-    # Empresa de SERVIÇO sem compras registradas (seção 7A da Skill): os
-    # campos baseados em compras devem indicar NÃO SE APLICA, nunca R$ 0,00.
-    if compras_aplicavel:
+    # A natureza vem da planilha permanente (seção 7A): apenas empresa de
+    # SERVIÇO pode ficar sem compras aplicáveis. Nesse caso os campos
+    # baseados em compras exibem NÃO SE APLICA — nunca um R$ 0,00
+    # fabricado e nunca Resultado = Receita - 0.
+    compras_raw = dados.get("compras")
+    compras_aplicavel = compras_raw not in (None, "")
+
+    if servico and not compras_aplicavel:
+        indicadores = [
+            ("Entradas (Compras)", "NÃO SE APLICA"),
+            ("Saídas (Vendas)", moeda(vendas)),
+            ("Resultado bruto", "NÃO SE APLICA"),
+            ("Margem", "NÃO SE APLICA"),
+        ]
+    else:
+        # EMPRESA DE COMÉRCIO — comportamento histórico, inalterado.
+        compras = float(dados.get("compras") or 0)
+
         resultado = dados.get("resultado_bruto")
         if resultado is None:
             resultado = vendas - compras
@@ -843,25 +886,27 @@ def gerar_pdf(dados, arquivo_saida):
         margem_pct = dados.get("margem")
         if margem_pct is None and compras:
             margem_pct = (float(resultado) / compras) * 100
-    else:
-        resultado = None
-        margem_pct = None
+
+        indicadores = [
+            ("Entradas (Compras)", moeda(compras)),
+            ("Saídas (Vendas)", moeda(vendas)),
+            ("Resultado bruto", moeda(resultado)),
+            ("Margem", percentual(margem_pct, 0)),
+        ]
 
     y -= GAP_CARDS + H_CARD
 
-    for indice, (titulo, valor) in enumerate(
-        (
-            ("Entradas (Compras)", moeda(compras) if compras_aplicavel else "NÃO SE APLICA"),
-            ("Saídas (Vendas)", moeda(vendas)),
-            ("Resultado bruto", moeda(resultado) if compras_aplicavel else "NÃO SE APLICA"),
-            ("Margem", percentual(margem_pct, 0) if compras_aplicavel else "NÃO SE APLICA"),
-        )
-    ):
+    qtd_indicadores = len(indicadores)
+    indicador_w = (
+        area_w - GAP_COLUNAS * (qtd_indicadores - 1)
+    ) / qtd_indicadores
+
+    for indice, (titulo, valor) in enumerate(indicadores):
         card_indicador(
             c,
-            MARGEM + (card_w + GAP_COLUNAS) * indice,
+            MARGEM + (indicador_w + GAP_COLUNAS) * indice,
             y,
-            card_w,
+            indicador_w,
             H_CARD,
             titulo,
             valor,
