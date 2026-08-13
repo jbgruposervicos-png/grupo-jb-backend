@@ -568,11 +568,48 @@ Também não fazer:
 
 Essas informações simplesmente não existem no relatório de empresa de serviço.
 
-O layout deve se reorganizar automaticamente para não deixar campos vazios nem espaços visualmente incorretos.
+O layout deve se reorganizar automaticamente, sem deixar campos vazios nem espaços reservados aos três campos removidos.
 
 A ausência de compras não deve, por si só, classificar o relatório como incompleto.
 
-Todos os demais dados continuam normalmente: razão social, CNPJ, competência, receita, comparações de faturamento, RBT12, faixa e alíquota quando disponíveis, DAS, vencimento, composição tributária, histórico/gráfico, notas faltantes e as demais informações previstas nesta Skill.
+### Renomeação do campo de saídas
+
+Somente para empresas de SERVIÇO, o campo
+
+SAÍDAS (VENDAS)
+
+passa a se chamar
+
+FATURAMENTO
+
+O valor de FATURAMENTO é a Receita Total Apurada / validada conforme a seção 7B.
+
+Para empresas de COMÉRCIO o campo continua se chamando SAÍDAS (VENDAS) — a renomeação nunca se aplica a comércio.
+
+### RBT12
+
+O RBT12 continua obrigatório e deve permanecer visível no relatório de serviço, preferencialmente no bloco FAIXA, conforme o layout atual.
+
+O RBT12 não pode ser omitido junto com os campos de compras.
+
+### O que permanece no relatório de serviço
+
+Permanecem normalmente:
+
+- Receita do mês;
+- Faixa;
+- RBT12;
+- Alíquota efetiva;
+- DAS a pagar;
+- Faturamento;
+- comparações;
+- notas faltantes;
+- detalhamento do DAS;
+- ISS, quando houver;
+- gráfico de faturamento/vendas;
+- comparativo;
+- rodapé;
+- razão social, CNPJ, competência, vencimento e as demais informações previstas nesta Skill.
 
 ## Empresa de COMÉRCIO
 
@@ -602,10 +639,10 @@ exatamente conforme a classificação lida na planilha, nunca deduzida da ausên
 Comportamento do gerador:
 
 - natureza SERVIÇO
-  → linha de indicadores sem Compras, sem Resultado bruto e sem Margem, reorganizada automaticamente para ocupar a largura útil;
+  → linha de indicadores sem Compras, sem Resultado bruto e sem Margem, contendo apenas FATURAMENTO, que ocupa a largura útil; o RBT12 é exibido no bloco FAIXA quando informado no campo `rbt12` do JSON;
 
 - natureza COMÉRCIO
-  → layout completo, com Entradas (Compras), Saídas (Vendas), Resultado bruto e Margem.
+  → layout completo e inalterado, com Entradas (Compras), Saídas (Vendas), Resultado bruto e Margem.
 
 Se o campo `natureza` estiver ausente, o gerador assume COMÉRCIO e mantém o layout completo.
 

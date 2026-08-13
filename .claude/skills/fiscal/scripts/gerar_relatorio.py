@@ -835,10 +835,19 @@ def gerar_pdf(dados, arquivo_saida):
         "Receita do mês", moeda(dados.get("receita_mes")),
     )
 
+    # Em empresa de SERVIÇO o RBT12 é exibido no bloco FAIXA (seção 7A):
+    # ele continua obrigatório e não pode sumir junto com os campos de
+    # compras. Sem RBT12 informado, e em COMÉRCIO, o subtítulo segue sendo
+    # o limite da faixa, como sempre foi.
+    if servico and dados.get("rbt12") not in (None, ""):
+        subtitulo_faixa = f"RBT12 {moeda(dados.get('rbt12'))}"
+    else:
+        subtitulo_faixa = texto_seguro(dados.get("limite_faixa"), "")
+
     card_indicador(
         c, MARGEM + card_w + GAP_COLUNAS, y, card_w, H_CARD,
         "Faixa", texto_seguro(dados.get("faixa")),
-        texto_seguro(dados.get("limite_faixa"), ""),
+        subtitulo_faixa,
     )
 
     card_indicador(
@@ -858,20 +867,16 @@ def gerar_pdf(dados, arquivo_saida):
 
     vendas = float(dados.get("vendas") or dados.get("receita_mes") or 0)
 
-    # A natureza vem da planilha permanente (seção 7A): apenas empresa de
-    # SERVIÇO pode ficar sem compras aplicáveis. Nesse caso os campos
-    # baseados em compras exibem NÃO SE APLICA — nunca um R$ 0,00
-    # fabricado e nunca Resultado = Receita - 0.
-    compras_raw = dados.get("compras")
-    compras_aplicavel = compras_raw not in (None, "")
-
-    if servico and not compras_aplicavel:
-        indicadores = [
-            ("Entradas (Compras)", "NÃO SE APLICA"),
-            ("Saídas (Vendas)", moeda(vendas)),
-            ("Resultado bruto", "NÃO SE APLICA"),
-            ("Margem", "NÃO SE APLICA"),
-        ]
+    if servico:
+        # EMPRESA DE SERVIÇO — seção 7A do SKILL.md.
+        #
+        # Entradas (Compras), Resultado bruto e Margem são OMITIDOS: a
+        # coluna COMPRA não é lida, nenhum cálculo derivado de compras é
+        # feito e nada ocupa o lugar desses campos — nem R$ 0,00, nem
+        # "NÃO SE APLICA", nem traço ou placeholder. O único indicador da
+        # linha é o FATURAMENTO (Receita Total Apurada), que passa a ocupar
+        # a largura útil inteira.
+        indicadores = [("Faturamento", moeda(vendas))]
     else:
         # EMPRESA DE COMÉRCIO — comportamento histórico, inalterado.
         compras = float(dados.get("compras") or 0)
