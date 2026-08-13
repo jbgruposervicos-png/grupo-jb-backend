@@ -503,6 +503,93 @@ Se houver dúvida sobre qual campo corresponde a uma informação, não escolher
 
 ---
 
+# 7A. NATUREZA DA EMPRESA — SERVIÇO OU COMÉRCIO
+
+## Regra principal
+
+A natureza da empresa (SERVIÇO ou COMÉRCIO) deve ser obtida OBRIGATORIAMENTE da planilha permanente de controle fiscal.
+
+NUNCA determinar que uma empresa é de serviço apenas porque não possui compras ou porque o valor de compras está zerado.
+
+A ausência ou o valor zerado de compras nunca pode ser utilizado, sozinho, para determinar se a empresa é serviço ou comércio.
+
+## Ordem obrigatória de consulta
+
+Para cada empresa selecionada pelo PGDAS:
+
+1. Ler o DAS correspondente.
+
+2. Identificar obrigatoriamente no DAS:
+   - CNPJ;
+   - competência / PA.
+
+3. A competência do DAS é a referência para determinar qual aba mensal da planilha deve ser consultada.
+
+4. Aplicar obrigatoriamente a regra de correspondência de abas já definida na seção 6.
+
+Exemplo:
+
+DAS competência 07/2026
+→ consultar a aba AGOSTO.
+
+5. Nunca consultar uma aba mensal diferente daquela correspondente à competência do DAS.
+
+6. Dentro da aba correta, localizar a empresa prioritariamente pelo CNPJ, conforme a seção 5.
+
+7. Após localizar a empresa, ler na própria planilha a informação que determina se a empresa é:
+   - SERVIÇO;
+   - COMÉRCIO.
+
+8. Essa classificação da planilha é a FONTE DE VERDADE para decidir como tratar compras e margem.
+
+## Empresa de SERVIÇO
+
+Quando a planilha classificar expressamente a empresa como SERVIÇO:
+
+- a ausência de compras pode ser normal;
+- compras podem ser apresentadas como NÃO SE APLICA;
+- resultado baseado em compras pode ser NÃO SE APLICA;
+- margem baseada em compras pode ser NÃO SE APLICA;
+- a ausência de compras não deve, por si só, classificar o relatório como incompleto;
+- não inventar valor de compras;
+- não dividir por zero.
+
+## Empresa de COMÉRCIO
+
+Quando a planilha classificar expressamente a empresa como COMÉRCIO:
+
+- consultar obrigatoriamente o valor de compras da empresa na aba correspondente à competência;
+- não aplicar a regra de "serviço sem compras";
+- utilizar o valor efetivamente registrado na planilha;
+- se o valor registrado for R$ 0,00, preservar R$ 0,00 e não inventar outro valor;
+- não calcular margem dividindo por zero;
+- qualquer necessidade de validação adicional deve ser registrada sem alterar os dados da planilha.
+
+Exemplo conhecido:
+
+E. GONZAGA EMPREENDIMENTOS LTDA é classificada como COMÉRCIO na planilha e deve seguir as regras de comércio, mesmo que o campo de compras da competência esteja zerado.
+
+## Competência como origem da consulta
+
+Toda consulta de dados mensais da planilha deve partir da competência identificada no DAS.
+
+Não usar:
+
+- nome do arquivo;
+- mês em que o arquivo foi enviado;
+- data de execução da Routine;
+- aba escolhida arbitrariamente.
+
+A competência do DAS, combinada com a regra de correspondência de abas da seção 6, determina a aba correta.
+
+## Demais validações
+
+Esta seção não elimina nenhuma outra validação da Skill.
+
+Divergência de receita, CNPJ, competência, matriz/filial, DAS, PGDAS ou qualquer outro dado obrigatório continua devendo ser analisada normalmente.
+
+---
+
 # 8. NOTAS FALTANTES
 
 Consultar também a aba:
@@ -541,6 +628,8 @@ Utilizar o valor efetivamente encontrado no DAS/PGDAS após validação.
 
 Utilizar o campo correspondente a COMPRA da planilha.
 
+Antes de tratar compras, aplicar a seção 7A para determinar, pela planilha, se a empresa é SERVIÇO ou COMÉRCIO.
+
 ## Saídas / Vendas
 
 Utilizar a receita validada para a competência.
@@ -554,6 +643,8 @@ Resultado bruto = Vendas - Compras
 Seguir a metodologia definida no modelo oficial do Relatório Fiscal.
 
 Não substituir a fórmula do modelo por outra definição de margem sem autorização.
+
+Nunca dividir por zero: se as compras forem inexistentes ou iguais a zero, tratar conforme a seção 7A, de acordo com a natureza registrada na planilha.
 
 ## Comparação com mês anterior
 
@@ -614,6 +705,8 @@ O relatório deve conter, conforme disponibilidade dos dados:
 - alertas relevantes.
 
 Nunca preencher um campo com dado estimado apenas para completar o layout.
+
+Quando a planilha classificar a empresa como SERVIÇO e não houver compras, os campos de compras, resultado baseado em compras e margem baseada em compras devem indicar NÃO SE APLICA, conforme a seção 7A.
 
 ---
 
