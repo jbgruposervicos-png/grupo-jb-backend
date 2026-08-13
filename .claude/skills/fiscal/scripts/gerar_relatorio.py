@@ -1,5 +1,6 @@
 import json
 import sys
+import unicodedata
 from pathlib import Path
 
 from reportlab.lib import colors
@@ -116,6 +117,32 @@ def texto_seguro(valor, padrao="-"):
     if valor is None or valor == "":
         return padrao
     return str(valor)
+
+
+def natureza_empresa(dados):
+    """Natureza da empresa conforme a planilha permanente: serviço ou comércio.
+
+    A natureza NUNCA é deduzida da ausência ou do valor zerado de compras —
+    ela vem exclusivamente do campo informado no JSON, que por sua vez é
+    lido da planilha (ver seção 7A do SKILL.md).
+
+    Aceita variações de caixa e acentuação ("SERVIÇO", "servico",
+    "Prestação de Serviços"). Qualquer valor não reconhecido — inclusive a
+    ausência do campo — mantém o comportamento histórico de COMÉRCIO, com o
+    layout completo de Compras/Resultado/Margem.
+    """
+    bruto = dados.get("natureza")
+    if bruto in (None, ""):
+        bruto = dados.get("natureza_empresa")
+
+    texto = str(bruto or "").strip().lower()
+    texto = (
+        unicodedata.normalize("NFKD", texto)
+        .encode("ascii", "ignore")
+        .decode("ascii")
+    )
+
+    return "servico" if "servic" in texto else "comercio"
 
 
 def calcular_variacao(atual, anterior):
@@ -737,6 +764,10 @@ def gerar_pdf(dados, arquivo_saida):
     card_w = (area_w - GAP_COLUNAS * 3) / 4
     meia_w = (area_w - GAP_COLUNAS) / 2
 
+    # A natureza vem da planilha permanente (campo "natureza" do JSON) e
+    # define qual dos dois layouts será renderizado.
+    servico = natureza_empresa(dados) == "servico"
+
     # ========================================================
     # CABEÇALHO
     # ========================================================
@@ -822,35 +853,55 @@ def gerar_pdf(dados, arquivo_saida):
     # SEGUNDA LINHA DE INDICADORES
     # ========================================================
 
-    compras = float(dados.get("compras") or 0)
     vendas = float(dados.get("vendas") or dados.get("receita_mes") or 0)
 
-    resultado = dados.get("resultado_bruto")
-    if resultado is None:
-        resultado = vendas - compras
+    if servico:
+        # EMPRESA DE SERVIÇO — seção 7A do SKILL.md.
+        #
+        # Compras, Resultado bruto e Margem são OMITIDOS integralmente: a
+        # coluna COMPRA da planilha não é lida, nenhum cálculo derivado de
+        # compras é feito e nada é substituído por zero ou por texto de
+        # preenchimento. A linha é remontada apenas com os indicadores que
+        # existem de fato, ocupando toda a largura útil.
+        indicadores = [("Saídas (Vendas)", moeda(vendas))]
 
-    # Metodologia do modelo oficial:
-    #   Resultado bruto = Vendas - Compras
-    #   Margem = Resultado bruto / Compras * 100
-    margem_pct = dados.get("margem")
-    if margem_pct is None and compras:
-        margem_pct = (float(resultado) / compras) * 100
+        if dados.get("rbt12") not in (None, ""):
+            indicadores.append(("RBT12", moeda(dados.get("rbt12"))))
+    else:
+        # EMPRESA DE COMÉRCIO — comportamento histórico, inalterado.
+        compras = float(dados.get("compras") or 0)
 
-    y -= GAP_CARDS + H_CARD
+        resultado = dados.get("resultado_bruto")
+        if resultado is None:
+            resultado = vendas - compras
 
-    for indice, (titulo, valor) in enumerate(
-        (
+        # Metodologia do modelo oficial:
+        #   Resultado bruto = Vendas - Compras
+        #   Margem = Resultado bruto / Compras * 100
+        margem_pct = dados.get("margem")
+        if margem_pct is None and compras:
+            margem_pct = (float(resultado) / compras) * 100
+
+        indicadores = [
             ("Entradas (Compras)", moeda(compras)),
             ("Saídas (Vendas)", moeda(vendas)),
             ("Resultado bruto", moeda(resultado)),
             ("Margem", percentual(margem_pct, 0)),
-        )
-    ):
+        ]
+
+    y -= GAP_CARDS + H_CARD
+
+    qtd_indicadores = len(indicadores)
+    indicador_w = (
+        area_w - GAP_COLUNAS * (qtd_indicadores - 1)
+    ) / qtd_indicadores
+
+    for indice, (titulo, valor) in enumerate(indicadores):
         card_indicador(
             c,
-            MARGEM + (card_w + GAP_COLUNAS) * indice,
+            MARGEM + (indicador_w + GAP_COLUNAS) * indice,
             y,
-            card_w,
+            indicador_w,
             H_CARD,
             titulo,
             valor,

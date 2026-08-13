@@ -544,15 +544,35 @@ DAS competência 07/2026
 
 ## Empresa de SERVIÇO
 
-Quando a planilha classificar expressamente a empresa como SERVIÇO:
+Quando a planilha classificar expressamente a empresa como SERVIÇO, os campos baseados em compras são OMITIDOS INTEGRALMENTE do Relatório Fiscal.
 
-- a ausência de compras pode ser normal;
-- compras podem ser apresentadas como NÃO SE APLICA;
-- resultado baseado em compras pode ser NÃO SE APLICA;
-- margem baseada em compras pode ser NÃO SE APLICA;
-- a ausência de compras não deve, por si só, classificar o relatório como incompleto;
-- não inventar valor de compras;
-- não dividir por zero.
+Não exibir:
+
+- campo Compras;
+- Resultado bruto baseado em compras;
+- Margem baseada em compras.
+
+Não exibir, nesses campos, nenhum conteúdo substituto:
+
+- não exibir R$ 0,00;
+- não exibir NÃO SE APLICA;
+- não exibir traço, vazio ou qualquer texto de preenchimento.
+
+Também não fazer:
+
+- não calcular resultado como Receita - 0;
+- não calcular margem;
+- não dividir por zero;
+- não utilizar qualquer conteúdo existente na coluna COMPRA da planilha para esses campos;
+- não inventar valor de compras.
+
+Essas informações simplesmente não existem no relatório de empresa de serviço.
+
+O layout deve se reorganizar automaticamente para não deixar campos vazios nem espaços visualmente incorretos.
+
+A ausência de compras não deve, por si só, classificar o relatório como incompleto.
+
+Todos os demais dados continuam normalmente: razão social, CNPJ, competência, receita, comparações de faturamento, RBT12, faixa e alíquota quando disponíveis, DAS, vencimento, composição tributária, histórico/gráfico, notas faltantes e as demais informações previstas nesta Skill.
 
 ## Empresa de COMÉRCIO
 
@@ -568,6 +588,30 @@ Quando a planilha classificar expressamente a empresa como COMÉRCIO:
 Exemplo conhecido:
 
 E. GONZAGA EMPREENDIMENTOS LTDA é classificada como COMÉRCIO na planilha e deve seguir as regras de comércio, mesmo que o campo de compras da competência esteja zerado.
+
+## Reflexo no gerador oficial
+
+O gerador oficial (R2) produz dois layouts e escolhe entre eles pelo campo `natureza` do JSON construído conforme R3.
+
+O JSON deve conter obrigatoriamente:
+
+`"natureza": "SERVICO"` ou `"natureza": "COMERCIO"`
+
+exatamente conforme a classificação lida na planilha, nunca deduzida da ausência de compras.
+
+Comportamento do gerador:
+
+- natureza SERVIÇO
+  → linha de indicadores sem Compras, sem Resultado bruto e sem Margem, reorganizada automaticamente para ocupar a largura útil;
+
+- natureza COMÉRCIO
+  → layout completo, com Entradas (Compras), Saídas (Vendas), Resultado bruto e Margem.
+
+Se o campo `natureza` estiver ausente, o gerador assume COMÉRCIO e mantém o layout completo.
+
+Por isso, para empresa de serviço, o campo `natureza` é obrigatório no JSON.
+
+Para empresa de serviço, não incluir o campo `compras` no JSON: o gerador ignora a coluna COMPRA nesse layout, e nenhum valor de compras deve ser transportado para o relatório.
 
 ## Competência como origem da consulta
 
@@ -776,7 +820,7 @@ O relatório deve conter, conforme disponibilidade dos dados:
 
 Nunca preencher um campo com dado estimado apenas para completar o layout.
 
-Quando a planilha classificar a empresa como SERVIÇO e não houver compras, os campos de compras, resultado baseado em compras e margem baseada em compras devem indicar NÃO SE APLICA, conforme a seção 7A.
+Quando a planilha classificar a empresa como SERVIÇO, os campos de compras, resultado baseado em compras e margem baseada em compras são OMITIDOS do relatório, conforme a seção 7A — não aparecem com valor zerado, com NÃO SE APLICA nem com qualquer outro texto de preenchimento.
 
 ---
 
