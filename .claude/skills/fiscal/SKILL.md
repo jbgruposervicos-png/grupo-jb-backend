@@ -155,11 +155,34 @@ Nunca pressupor que exista apenas um DAS e apenas um PGDAS na pasta.
 
 O processamento fiscal é, por padrão, um processamento em lote.
 
+## L0. REGRA PRINCIPAL — O PGDAS DETERMINA O ESCOPO
+
+A existência de PGDAS é o critério que determina quais empresas devem receber Relatório Fiscal.
+
+Cada PGDAS encontrado na pasta Fiscal inicia um possível processamento.
+
+Empresas que possuem somente DAS, mas não possuem PGDAS na pasta Fiscal:
+
+- NÃO são consideradas pendentes;
+- NÃO precisam de Relatório Fiscal.
+
+A ausência de PGDAS significa que aquela empresa não foi selecionada pelo Departamento Fiscal para receber Relatório Fiscal naquela competência.
+
+Portanto, para empresa sem PGDAS:
+
+- não tentar gerar Relatório Fiscal;
+- não consultar a planilha permanente;
+- não tentar distribuir Relatório Fiscal.
+
+Um DAS sem PGDAS correspondente não representa erro, pendência nem documento faltante.
+
 ## L1. Varredura inicial
 
 Ao iniciar, varra TODOS os documentos disponíveis na pasta Fiscal antes de processar qualquer coisa.
 
 Não começar a gerar relatórios enquanto a varredura completa não estiver concluída.
+
+Na varredura, identificar primeiro TODOS os PGDAS existentes — eles definem a lista de empresas a processar no lote.
 
 ## L2. Planilha permanente
 
@@ -187,7 +210,7 @@ Classificar os PDFs em:
 - Relatório Fiscal já existente;
 - outros documentos.
 
-## L5. Agrupamento
+## L5. Agrupamento a partir do PGDAS
 
 Agrupar os documentos pela chave:
 
@@ -195,12 +218,23 @@ CNPJ + COMPETÊNCIA
 
 Cada grupo é um processamento INDEPENDENTE.
 
+O grupo nasce de um PGDAS, nunca de um DAS.
+
+Para cada PGDAS encontrado:
+
+1. identificar razão social;
+2. identificar CNPJ;
+3. identificar competência;
+4. procurar o DAS correspondente pelo MESMO CNPJ e MESMA competência.
+
+DAS que não corresponderem a nenhum PGDAS não formam grupo e ficam FORA DO ESCOPO DO RELATÓRIO (ver L6 e L14).
+
 ## L6. Elegibilidade do grupo
 
 Para um grupo ser elegível ao processamento automático, deve existir:
 
 - exatamente um PGDAS válido;
-- exatamente um DAS válido;
+- exatamente um DAS válido correspondente;
 - cliente correspondente na planilha permanente.
 
 Confirmar obrigatoriamente, dentro de cada grupo:
@@ -210,6 +244,25 @@ CNPJ do DAS = CNPJ do PGDAS
 e
 
 Competência do DAS = Competência do PGDAS
+
+Resultados possíveis da conferência entre PGDAS e DAS:
+
+- exatamente 1 PGDAS e exatamente 1 DAS
+  → grupo apto às demais validações e à geração do relatório;
+
+- PGDAS presente e nenhum DAS correspondente
+  → PENDENTE — DAS AUSENTE;
+
+- PGDAS presente e mais de um DAS correspondente
+  → PENDENTE — DUPLICIDADE DE DAS;
+
+- mais de um PGDAS para o mesmo CNPJ e competência
+  → PENDENTE — DUPLICIDADE DE PGDAS;
+
+- DAS sem PGDAS correspondente
+  → FORA DO ESCOPO DO RELATÓRIO — SEM PGDAS (não é pendência).
+
+DAS fora do escopo devem ser ignorados pelo fluxo de Relatório Fiscal: apenas registrados no resumo, sem consulta à planilha, sem geração e sem distribuição de relatório.
 
 ## L7. Isolamento de falhas
 
@@ -241,6 +294,11 @@ Se houver mais de um DAS ou mais de um PGDAS para o mesmo CNPJ e a mesma compet�
 - tratar como duplicidade;
 - não escolher arbitrariamente;
 - não processar esse grupo até que a situação esteja resolvida.
+
+Distinguir os dois casos no resumo:
+
+- mais de um DAS para o PGDAS → PENDENTE — DUPLICIDADE DE DAS;
+- mais de um PGDAS para o mesmo CNPJ e competência → PENDENTE — DUPLICIDADE DE PGDAS.
 
 ## L10. Relatório já existente
 
@@ -287,14 +345,19 @@ Ao final da execução, produzir um resumo do lote, por empresa / CNPJ / compet�
 - PROCESSADO
 - JÁ PROCESSADO
 - PENDENTE — DAS AUSENTE
-- PENDENTE — PGDAS AUSENTE
-- PENDENTE — DUPLICIDADE
+- PENDENTE — DUPLICIDADE DE DAS
+- PENDENTE — DUPLICIDADE DE PGDAS
 - PENDENTE — COMPETÊNCIA DIVERGENTE
 - PENDENTE — EMPRESA NÃO LOCALIZADA
 - ERRO DE GERAÇÃO
 - ERRO DE DISTRIBUIÇÃO
+- FORA DO ESCOPO DO RELATÓRIO — SEM PGDAS
 
 Cada linha do resumo deve permitir identificar a empresa, o CNPJ, a competência e o motivo do estado.
+
+FORA DO ESCOPO DO RELATÓRIO — SEM PGDAS não é pendência e não deve ser contabilizado como falha do lote.
+
+Não existe o estado "PENDENTE — PGDAS AUSENTE": a falta de PGDAS é uma decisão do Departamento Fiscal, não uma pendência.
 
 ---
 
