@@ -590,6 +590,72 @@ Divergência de receita, CNPJ, competência, matriz/filial, DAS, PGDAS ou qualqu
 
 ---
 
+# 7B. COMPOSIÇÃO DA RECEITA — XML, CARTÃO E PIX E OUTRAS RECEITAS
+
+## Origem dos valores
+
+A coluna de vendas/saídas originada dos XMLs representa o faturamento documentado por notas fiscais.
+
+A planilha também possui os valores de vendas recebidas por CARTÃO E PIX.
+
+Quando o total de Cartão e Pix for superior ao faturamento identificado nos XMLs/notas fiscais, a diferença deve ser tratada como OUTRAS RECEITAS.
+
+## Metodologia
+
+Se CARTÃO E PIX > XML:
+
+OUTRAS RECEITAS = CARTÃO E PIX - XML
+
+RECEITA TOTAL APURADA = XML + OUTRAS RECEITAS
+
+Nesse caso, a Receita Total Apurada será igual ao valor de Cartão e Pix.
+
+Se XML >= CARTÃO E PIX:
+
+OUTRAS RECEITAS = R$ 0,00
+
+RECEITA TOTAL APURADA = XML
+
+De forma equivalente:
+
+RECEITA TOTAL APURADA = maior valor entre XML e CARTÃO E PIX.
+
+## Validação com o PGDAS
+
+Não considerar como divergência o simples fato de a receita do PGDAS ser superior à coluna de vendas/saídas dos XMLs.
+
+Antes de registrar divergência:
+
+1. Ler o faturamento proveniente de XML/notas.
+2. Ler o valor de Cartão e Pix.
+3. Calcular Outras Receitas conforme a metodologia acima.
+4. Calcular a Receita Total Apurada.
+5. Comparar a Receita Total Apurada com a receita declarada no PGDAS.
+
+Se:
+
+RECEITA TOTAL APURADA = RECEITA PGDAS
+
+considerar a receita VALIDADA.
+
+Somente registrar divergência de faturamento quando a Receita Total Apurada, após considerar Outras Receitas, for diferente da receita declarada no PGDAS.
+
+## Reflexo no Relatório Fiscal
+
+A receita/vendas apresentada como faturamento total no Relatório Fiscal deve corresponder à receita total declarada/apurada da competência.
+
+Quando houver Outras Receitas, elas fazem parte do faturamento total.
+
+A planilha deve ser utilizada para demonstrar e validar a composição:
+
+XML/Notas + Outras Receitas = Receita Total
+
+Não tratar Outras Receitas como erro ou inconsistência.
+
+Não inventar valores de Cartão e Pix nem de Outras Receitas: se o campo não existir na planilha, não estimar — aplicar a regra apenas com os valores efetivamente encontrados.
+
+---
+
 # 8. NOTAS FALTANTES
 
 Consultar também a aba:
@@ -620,6 +686,8 @@ Utilizar os dados efetivamente encontrados nos documentos e na planilha.
 
 Priorizar a receita declarada no PGDAS.
 
+A composição dessa receita (XML/Notas + Outras Receitas) deve ser apurada e validada conforme a seção 7B.
+
 ## DAS a pagar
 
 Utilizar o valor efetivamente encontrado no DAS/PGDAS após validação.
@@ -633,6 +701,8 @@ Antes de tratar compras, aplicar a seção 7A para determinar, pela planilha, se
 ## Saídas / Vendas
 
 Utilizar a receita validada para a competência.
+
+Entende-se por receita validada a Receita Total Apurada definida na seção 7B, já incluídas as Outras Receitas quando existirem.
 
 ## Resultado bruto
 
