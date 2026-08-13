@@ -155,11 +155,34 @@ Nunca pressupor que exista apenas um DAS e apenas um PGDAS na pasta.
 
 O processamento fiscal é, por padrão, um processamento em lote.
 
+## L0. REGRA PRINCIPAL — O PGDAS DETERMINA O ESCOPO
+
+A existência de PGDAS é o critério que determina quais empresas devem receber Relatório Fiscal.
+
+Cada PGDAS encontrado na pasta Fiscal inicia um possível processamento.
+
+Empresas que possuem somente DAS, mas não possuem PGDAS na pasta Fiscal:
+
+- NÃO são consideradas pendentes;
+- NÃO precisam de Relatório Fiscal.
+
+A ausência de PGDAS significa que aquela empresa não foi selecionada pelo Departamento Fiscal para receber Relatório Fiscal naquela competência.
+
+Portanto, para empresa sem PGDAS:
+
+- não tentar gerar Relatório Fiscal;
+- não consultar a planilha permanente;
+- não tentar distribuir Relatório Fiscal.
+
+Um DAS sem PGDAS correspondente não representa erro, pendência nem documento faltante.
+
 ## L1. Varredura inicial
 
 Ao iniciar, varra TODOS os documentos disponíveis na pasta Fiscal antes de processar qualquer coisa.
 
 Não começar a gerar relatórios enquanto a varredura completa não estiver concluída.
+
+Na varredura, identificar primeiro TODOS os PGDAS existentes — eles definem a lista de empresas a processar no lote.
 
 ## L2. Planilha permanente
 
@@ -187,7 +210,7 @@ Classificar os PDFs em:
 - Relatório Fiscal já existente;
 - outros documentos.
 
-## L5. Agrupamento
+## L5. Agrupamento a partir do PGDAS
 
 Agrupar os documentos pela chave:
 
@@ -195,12 +218,23 @@ CNPJ + COMPETÊNCIA
 
 Cada grupo é um processamento INDEPENDENTE.
 
+O grupo nasce de um PGDAS, nunca de um DAS.
+
+Para cada PGDAS encontrado:
+
+1. identificar razão social;
+2. identificar CNPJ;
+3. identificar competência;
+4. procurar o DAS correspondente pelo MESMO CNPJ e MESMA competência.
+
+DAS que não corresponderem a nenhum PGDAS não formam grupo e ficam FORA DO ESCOPO DO RELATÓRIO (ver L6 e L14).
+
 ## L6. Elegibilidade do grupo
 
 Para um grupo ser elegível ao processamento automático, deve existir:
 
 - exatamente um PGDAS válido;
-- exatamente um DAS válido;
+- exatamente um DAS válido correspondente;
 - cliente correspondente na planilha permanente.
 
 Confirmar obrigatoriamente, dentro de cada grupo:
@@ -210,6 +244,25 @@ CNPJ do DAS = CNPJ do PGDAS
 e
 
 Competência do DAS = Competência do PGDAS
+
+Resultados possíveis da conferência entre PGDAS e DAS:
+
+- exatamente 1 PGDAS e exatamente 1 DAS
+  → grupo apto às demais validações e à geração do relatório;
+
+- PGDAS presente e nenhum DAS correspondente
+  → PENDENTE — DAS AUSENTE;
+
+- PGDAS presente e mais de um DAS correspondente
+  → PENDENTE — DUPLICIDADE DE DAS;
+
+- mais de um PGDAS para o mesmo CNPJ e competência
+  → PENDENTE — DUPLICIDADE DE PGDAS;
+
+- DAS sem PGDAS correspondente
+  → FORA DO ESCOPO DO RELATÓRIO — SEM PGDAS (não é pendência).
+
+DAS fora do escopo devem ser ignorados pelo fluxo de Relatório Fiscal: apenas registrados no resumo, sem consulta à planilha, sem geração e sem distribuição de relatório.
 
 ## L7. Isolamento de falhas
 
@@ -241,6 +294,11 @@ Se houver mais de um DAS ou mais de um PGDAS para o mesmo CNPJ e a mesma compet�
 - tratar como duplicidade;
 - não escolher arbitrariamente;
 - não processar esse grupo até que a situação esteja resolvida.
+
+Distinguir os dois casos no resumo:
+
+- mais de um DAS para o PGDAS → PENDENTE — DUPLICIDADE DE DAS;
+- mais de um PGDAS para o mesmo CNPJ e competência → PENDENTE — DUPLICIDADE DE PGDAS.
 
 ## L10. Relatório já existente
 
@@ -287,14 +345,19 @@ Ao final da execução, produzir um resumo do lote, por empresa / CNPJ / compet�
 - PROCESSADO
 - JÁ PROCESSADO
 - PENDENTE — DAS AUSENTE
-- PENDENTE — PGDAS AUSENTE
-- PENDENTE — DUPLICIDADE
+- PENDENTE — DUPLICIDADE DE DAS
+- PENDENTE — DUPLICIDADE DE PGDAS
 - PENDENTE — COMPETÊNCIA DIVERGENTE
 - PENDENTE — EMPRESA NÃO LOCALIZADA
 - ERRO DE GERAÇÃO
 - ERRO DE DISTRIBUIÇÃO
+- FORA DO ESCOPO DO RELATÓRIO — SEM PGDAS
 
 Cada linha do resumo deve permitir identificar a empresa, o CNPJ, a competência e o motivo do estado.
+
+FORA DO ESCOPO DO RELATÓRIO — SEM PGDAS não é pendência e não deve ser contabilizado como falha do lote.
+
+Não existe o estado "PENDENTE — PGDAS AUSENTE": a falta de PGDAS é uma decisão do Departamento Fiscal, não uma pendência.
 
 ---
 
@@ -440,6 +503,159 @@ Se houver dúvida sobre qual campo corresponde a uma informação, não escolher
 
 ---
 
+# 7A. NATUREZA DA EMPRESA — SERVIÇO OU COMÉRCIO
+
+## Regra principal
+
+A natureza da empresa (SERVIÇO ou COMÉRCIO) deve ser obtida OBRIGATORIAMENTE da planilha permanente de controle fiscal.
+
+NUNCA determinar que uma empresa é de serviço apenas porque não possui compras ou porque o valor de compras está zerado.
+
+A ausência ou o valor zerado de compras nunca pode ser utilizado, sozinho, para determinar se a empresa é serviço ou comércio.
+
+## Ordem obrigatória de consulta
+
+Para cada empresa selecionada pelo PGDAS:
+
+1. Ler o DAS correspondente.
+
+2. Identificar obrigatoriamente no DAS:
+   - CNPJ;
+   - competência / PA.
+
+3. A competência do DAS é a referência para determinar qual aba mensal da planilha deve ser consultada.
+
+4. Aplicar obrigatoriamente a regra de correspondência de abas já definida na seção 6.
+
+Exemplo:
+
+DAS competência 07/2026
+→ consultar a aba AGOSTO.
+
+5. Nunca consultar uma aba mensal diferente daquela correspondente à competência do DAS.
+
+6. Dentro da aba correta, localizar a empresa prioritariamente pelo CNPJ, conforme a seção 5.
+
+7. Após localizar a empresa, ler na própria planilha a informação que determina se a empresa é:
+   - SERVIÇO;
+   - COMÉRCIO.
+
+8. Essa classificação da planilha é a FONTE DE VERDADE para decidir como tratar compras e margem.
+
+## Empresa de SERVIÇO
+
+Quando a planilha classificar expressamente a empresa como SERVIÇO:
+
+- a ausência de compras pode ser normal;
+- compras podem ser apresentadas como NÃO SE APLICA;
+- resultado baseado em compras pode ser NÃO SE APLICA;
+- margem baseada em compras pode ser NÃO SE APLICA;
+- a ausência de compras não deve, por si só, classificar o relatório como incompleto;
+- não inventar valor de compras;
+- não dividir por zero.
+
+## Empresa de COMÉRCIO
+
+Quando a planilha classificar expressamente a empresa como COMÉRCIO:
+
+- consultar obrigatoriamente o valor de compras da empresa na aba correspondente à competência;
+- não aplicar a regra de "serviço sem compras";
+- utilizar o valor efetivamente registrado na planilha;
+- se o valor registrado for R$ 0,00, preservar R$ 0,00 e não inventar outro valor;
+- não calcular margem dividindo por zero;
+- qualquer necessidade de validação adicional deve ser registrada sem alterar os dados da planilha.
+
+Exemplo conhecido:
+
+E. GONZAGA EMPREENDIMENTOS LTDA é classificada como COMÉRCIO na planilha e deve seguir as regras de comércio, mesmo que o campo de compras da competência esteja zerado.
+
+## Competência como origem da consulta
+
+Toda consulta de dados mensais da planilha deve partir da competência identificada no DAS.
+
+Não usar:
+
+- nome do arquivo;
+- mês em que o arquivo foi enviado;
+- data de execução da Routine;
+- aba escolhida arbitrariamente.
+
+A competência do DAS, combinada com a regra de correspondência de abas da seção 6, determina a aba correta.
+
+## Demais validações
+
+Esta seção não elimina nenhuma outra validação da Skill.
+
+Divergência de receita, CNPJ, competência, matriz/filial, DAS, PGDAS ou qualquer outro dado obrigatório continua devendo ser analisada normalmente.
+
+---
+
+# 7B. COMPOSIÇÃO DA RECEITA — XML, CARTÃO E PIX E OUTRAS RECEITAS
+
+## Origem dos valores
+
+A coluna de vendas/saídas originada dos XMLs representa o faturamento documentado por notas fiscais.
+
+A planilha também possui os valores de vendas recebidas por CARTÃO E PIX.
+
+Quando o total de Cartão e Pix for superior ao faturamento identificado nos XMLs/notas fiscais, a diferença deve ser tratada como OUTRAS RECEITAS.
+
+## Metodologia
+
+Se CARTÃO E PIX > XML:
+
+OUTRAS RECEITAS = CARTÃO E PIX - XML
+
+RECEITA TOTAL APURADA = XML + OUTRAS RECEITAS
+
+Nesse caso, a Receita Total Apurada será igual ao valor de Cartão e Pix.
+
+Se XML >= CARTÃO E PIX:
+
+OUTRAS RECEITAS = R$ 0,00
+
+RECEITA TOTAL APURADA = XML
+
+De forma equivalente:
+
+RECEITA TOTAL APURADA = maior valor entre XML e CARTÃO E PIX.
+
+## Validação com o PGDAS
+
+Não considerar como divergência o simples fato de a receita do PGDAS ser superior à coluna de vendas/saídas dos XMLs.
+
+Antes de registrar divergência:
+
+1. Ler o faturamento proveniente de XML/notas.
+2. Ler o valor de Cartão e Pix.
+3. Calcular Outras Receitas conforme a metodologia acima.
+4. Calcular a Receita Total Apurada.
+5. Comparar a Receita Total Apurada com a receita declarada no PGDAS.
+
+Se:
+
+RECEITA TOTAL APURADA = RECEITA PGDAS
+
+considerar a receita VALIDADA.
+
+Somente registrar divergência de faturamento quando a Receita Total Apurada, após considerar Outras Receitas, for diferente da receita declarada no PGDAS.
+
+## Reflexo no Relatório Fiscal
+
+A receita/vendas apresentada como faturamento total no Relatório Fiscal deve corresponder à receita total declarada/apurada da competência.
+
+Quando houver Outras Receitas, elas fazem parte do faturamento total.
+
+A planilha deve ser utilizada para demonstrar e validar a composição:
+
+XML/Notas + Outras Receitas = Receita Total
+
+Não tratar Outras Receitas como erro ou inconsistência.
+
+Não inventar valores de Cartão e Pix nem de Outras Receitas: se o campo não existir na planilha, não estimar — aplicar a regra apenas com os valores efetivamente encontrados.
+
+---
+
 # 8. NOTAS FALTANTES
 
 Consultar também a aba:
@@ -470,6 +686,8 @@ Utilizar os dados efetivamente encontrados nos documentos e na planilha.
 
 Priorizar a receita declarada no PGDAS.
 
+A composição dessa receita (XML/Notas + Outras Receitas) deve ser apurada e validada conforme a seção 7B.
+
 ## DAS a pagar
 
 Utilizar o valor efetivamente encontrado no DAS/PGDAS após validação.
@@ -478,9 +696,13 @@ Utilizar o valor efetivamente encontrado no DAS/PGDAS após validação.
 
 Utilizar o campo correspondente a COMPRA da planilha.
 
+Antes de tratar compras, aplicar a seção 7A para determinar, pela planilha, se a empresa é SERVIÇO ou COMÉRCIO.
+
 ## Saídas / Vendas
 
 Utilizar a receita validada para a competência.
+
+Entende-se por receita validada a Receita Total Apurada definida na seção 7B, já incluídas as Outras Receitas quando existirem.
 
 ## Resultado bruto
 
@@ -491,6 +713,8 @@ Resultado bruto = Vendas - Compras
 Seguir a metodologia definida no modelo oficial do Relatório Fiscal.
 
 Não substituir a fórmula do modelo por outra definição de margem sem autorização.
+
+Nunca dividir por zero: se as compras forem inexistentes ou iguais a zero, tratar conforme a seção 7A, de acordo com a natureza registrada na planilha.
 
 ## Comparação com mês anterior
 
@@ -551,6 +775,8 @@ O relatório deve conter, conforme disponibilidade dos dados:
 - alertas relevantes.
 
 Nunca preencher um campo com dado estimado apenas para completar o layout.
+
+Quando a planilha classificar a empresa como SERVIÇO e não houver compras, os campos de compras, resultado baseado em compras e margem baseada em compras devem indicar NÃO SE APLICA, conforme a seção 7A.
 
 ---
 
