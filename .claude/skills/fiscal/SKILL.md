@@ -143,6 +143,161 @@ Todas as demais regras deste SKILL.md permanecem válidas e devem ser aplicadas 
 
 ---
 
+# PROCESSAMENTO EM LOTE
+
+A pasta:
+
+Departamento Geral > Fiscal
+
+é uma FILA ÚNICA e pode conter, ao mesmo tempo, documentos de várias empresas diferentes.
+
+Nunca pressupor que exista apenas um DAS e apenas um PGDAS na pasta.
+
+O processamento fiscal é, por padrão, um processamento em lote.
+
+## L1. Varredura inicial
+
+Ao iniciar, varra TODOS os documentos disponíveis na pasta Fiscal antes de processar qualquer coisa.
+
+Não começar a gerar relatórios enquanto a varredura completa não estiver concluída.
+
+## L2. Planilha permanente
+
+A planilha permanente de controle fiscal NÃO é um documento de lote.
+
+Ela é uma fonte de consulta compartilhada por todas as empresas e não pertence a nenhum grupo.
+
+Ignorá-la na classificação dos documentos do lote, mantendo todas as regras de proteção já definidas para ela (seção 5).
+
+## L3. Identificação de cada PDF
+
+Para cada PDF fiscal encontrado, identificar, quando possível:
+
+- tipo do documento;
+- CNPJ;
+- razão social;
+- competência.
+
+## L4. Classificação
+
+Classificar os PDFs em:
+
+- DAS;
+- PGDAS;
+- Relatório Fiscal já existente;
+- outros documentos.
+
+## L5. Agrupamento
+
+Agrupar os documentos pela chave:
+
+CNPJ + COMPETÊNCIA
+
+Cada grupo é um processamento INDEPENDENTE.
+
+## L6. Elegibilidade do grupo
+
+Para um grupo ser elegível ao processamento automático, deve existir:
+
+- exatamente um PGDAS válido;
+- exatamente um DAS válido;
+- cliente correspondente na planilha permanente.
+
+Confirmar obrigatoriamente, dentro de cada grupo:
+
+CNPJ do DAS = CNPJ do PGDAS
+
+e
+
+Competência do DAS = Competência do PGDAS
+
+## L7. Isolamento de falhas
+
+Se um grupo apresentar erro, inconsistência, duplicidade ou documento ausente:
+
+- não processar esse grupo;
+- registrar claramente o motivo;
+- continuar o processamento dos demais grupos.
+
+Um erro em uma empresa NUNCA deve interromper todo o lote.
+
+As regras de interrupção definidas nas demais seções aplicam-se ao grupo em questão, não ao lote inteiro.
+
+## L8. Competência esperada
+
+A competência automática esperada normalmente é o mês anterior ao mês de execução.
+
+Exemplo:
+
+execução em agosto/2026
+→ competência esperada 07/2026.
+
+Documentos de outras competências devem permanecer separados e não podem ser pareados com a competência atual.
+
+## L9. Duplicidade
+
+Se houver mais de um DAS ou mais de um PGDAS para o mesmo CNPJ e a mesma competência:
+
+- tratar como duplicidade;
+- não escolher arbitrariamente;
+- não processar esse grupo até que a situação esteja resolvida.
+
+## L10. Relatório já existente
+
+Antes de gerar um novo relatório, verificar se já existe na própria pasta Fiscal um Relatório Fiscal para o mesmo CNPJ e a mesma competência.
+
+Se o relatório já existir:
+
+- não gerar duplicata;
+- verificar se DAS, PGDAS e Relatório já foram distribuídos para o destino;
+- se o trio estiver corretamente arquivado, marcar o grupo como JÁ PROCESSADO e seguir para o próximo grupo.
+
+## L11. Grupo completo sem relatório
+
+Se DAS + PGDAS estiverem presentes e não houver relatório para aquele CNPJ e competência:
+
+1. consultar a planilha permanente;
+2. gerar o JSON real (conforme R3);
+3. executar o gerador oficial (conforme R2 e R7);
+4. salvar o Relatório Fiscal na própria pasta Fiscal;
+5. depois realizar a distribuição definida nesta Skill (seções 14 a 17).
+
+## L12. Nome do relatório no lote
+
+O nome do relatório deve identificar empresa e competência, seguindo a regra da seção 12:
+
+RELATORIO FISCAL - [RAZAO SOCIAL] - [MM-AAAA].pdf
+
+Exemplo:
+
+RELATORIO FISCAL - BEATRIZ DE BRITO CANTOR - 07-2026.pdf
+
+## L13. Permanência dos arquivos
+
+Após gerado, o relatório deve permanecer também na pasta Fiscal enquanto os documentos temporários não forem removidos pelo usuário.
+
+Nunca mover DAS ou PGDAS para fora da pasta Fiscal durante o processamento.
+
+Copiar para o destino e preservar os originais.
+
+## L14. Resumo do lote
+
+Ao final da execução, produzir um resumo do lote, por empresa / CNPJ / competência, com estados semelhantes a:
+
+- PROCESSADO
+- JÁ PROCESSADO
+- PENDENTE — DAS AUSENTE
+- PENDENTE — PGDAS AUSENTE
+- PENDENTE — DUPLICIDADE
+- PENDENTE — COMPETÊNCIA DIVERGENTE
+- PENDENTE — EMPRESA NÃO LOCALIZADA
+- ERRO DE GERAÇÃO
+- ERRO DE DISTRIBUIÇÃO
+
+Cada linha do resumo deve permitir identificar a empresa, o CNPJ, a competência e o motivo do estado.
+
+---
+
 # 2. REGRA DE COMPETÊNCIA
 
 O Departamento Fiscal trabalha sempre com a competência anterior ao mês de processamento.
