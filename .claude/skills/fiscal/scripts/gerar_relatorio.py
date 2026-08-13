@@ -687,6 +687,9 @@ def bloco_das(c, x, y, w, h, dados, impostos):
         f"INSS/CPP {moeda(impostos.get('cpp'))}   •   ICMS {moeda(impostos.get('icms'))}",
     ]
 
+    if impostos.get("iss") not in (None, ""):
+        linhas.append(f"ISS {moeda(impostos.get('iss'))}")
+
     # Principal/multa/juros numa linha só quando couber, para não deixar o
     # bloco alto demais; caso contrário, quebra em duas.
     encargos = (
@@ -822,28 +825,36 @@ def gerar_pdf(dados, arquivo_saida):
     # SEGUNDA LINHA DE INDICADORES
     # ========================================================
 
-    compras = float(dados.get("compras") or 0)
+    compras_raw = dados.get("compras")
+    compras_aplicavel = compras_raw is not None and compras_raw != ""
+    compras = float(compras_raw) if compras_aplicavel else 0.0
     vendas = float(dados.get("vendas") or dados.get("receita_mes") or 0)
 
-    resultado = dados.get("resultado_bruto")
-    if resultado is None:
-        resultado = vendas - compras
+    # Empresa de SERVIÇO sem compras registradas (seção 7A da Skill): os
+    # campos baseados em compras devem indicar NÃO SE APLICA, nunca R$ 0,00.
+    if compras_aplicavel:
+        resultado = dados.get("resultado_bruto")
+        if resultado is None:
+            resultado = vendas - compras
 
-    # Metodologia do modelo oficial:
-    #   Resultado bruto = Vendas - Compras
-    #   Margem = Resultado bruto / Compras * 100
-    margem_pct = dados.get("margem")
-    if margem_pct is None and compras:
-        margem_pct = (float(resultado) / compras) * 100
+        # Metodologia do modelo oficial:
+        #   Resultado bruto = Vendas - Compras
+        #   Margem = Resultado bruto / Compras * 100
+        margem_pct = dados.get("margem")
+        if margem_pct is None and compras:
+            margem_pct = (float(resultado) / compras) * 100
+    else:
+        resultado = None
+        margem_pct = None
 
     y -= GAP_CARDS + H_CARD
 
     for indice, (titulo, valor) in enumerate(
         (
-            ("Entradas (Compras)", moeda(compras)),
+            ("Entradas (Compras)", moeda(compras) if compras_aplicavel else "NÃO SE APLICA"),
             ("Saídas (Vendas)", moeda(vendas)),
-            ("Resultado bruto", moeda(resultado)),
-            ("Margem", percentual(margem_pct, 0)),
+            ("Resultado bruto", moeda(resultado) if compras_aplicavel else "NÃO SE APLICA"),
+            ("Margem", percentual(margem_pct, 0) if compras_aplicavel else "NÃO SE APLICA"),
         )
     ):
         card_indicador(
@@ -1014,6 +1025,9 @@ def gerar_pdf(dados, arquivo_saida):
         f"INSS/CPP {moeda(impostos.get('cpp'))}  •  "
         f"ICMS {moeda(impostos.get('icms'))}"
     )
+
+    if impostos.get("iss") not in (None, ""):
+        rodape += f"  •  ISS {moeda(impostos.get('iss'))}"
 
     escrever_ajustado(
         c,
