@@ -26,6 +26,123 @@ DAS, PGDAS e Relatório Fiscal são documentos relacionados ao processamento de 
 
 ---
 
+# RECURSOS OBRIGATÓRIOS DA SKILL
+
+Esta Skill possui recursos próprios, versionados no repositório.
+
+Eles são obrigatórios e não são opcionais.
+
+## R1. Modelo visual oficial
+
+O modelo visual oficial do Relatório Fiscal é:
+
+`.claude/skills/fiscal/references/modelo-relatorio-fiscal.pdf`
+
+Esse arquivo define o layout aceito pelo Grupo JB: cabeçalho azul com logo JB, razão social e competência por extenso, duas linhas de cards de indicadores, cards de comparação, bloco de notas não lançadas, detalhamento do DAS, gráfico de vendas mensais, comparativo de vendas e rodapé.
+
+O relatório final deve seguir visualmente esse modelo o mais fielmente possível.
+
+Não redesenhar o relatório, não trocar a ordem dos blocos e não inventar um layout alternativo.
+
+## R2. Script oficial de geração
+
+O script oficial responsável pela geração do PDF é:
+
+`.claude/skills/fiscal/scripts/gerar_relatorio.py`
+
+Esse script é a única forma autorizada de produzir o Relatório Fiscal quando estiver disponível.
+
+O Claude NÃO deve criar o PDF manualmente (HTML, impressão, desenho ad hoc, outra biblioteca ou geração à mão) quando o script estiver disponível.
+
+Somente se o script estiver comprovadamente indisponível, o Claude deve interromper e informar o problema — nunca improvisar um gerador paralelo.
+
+A dependência necessária está declarada em `requirements.txt` (`reportlab`).
+
+## R3. Construção do JSON antes de executar o script
+
+Antes de executar o script, o Claude deve construir um arquivo JSON contendo SOMENTE dados já extraídos e validados de:
+
+1. PGDAS;
+2. DAS;
+3. planilha permanente de controle fiscal.
+
+Nenhum outro dado pode entrar nesse arquivo.
+
+Campo sem origem comprovada nesses três documentos deve ficar ausente ou vazio, nunca preenchido por conveniência.
+
+## R4. Papel do arquivo de exemplo
+
+O arquivo:
+
+`.claude/skills/fiscal/references/exemplo-dados.json`
+
+é SOMENTE uma referência de ESTRUTURA dos dados esperados pelo gerador (nomes de chaves, tipos e formato dos blocos).
+
+Nunca utilizar os valores desse arquivo em um processamento real.
+
+Os valores nele contidos (JB ITABOLOS PANIFICACAO E CONFEITARIA LTDA, competência 05/2026, receita, DAS, tributos, histórico de vendas, notas faltantes) são fictícios para efeito de demonstração.
+
+Em processamento real, todos os valores devem vir dos documentos reais (PGDAS e DAS) e da planilha permanente de controle fiscal.
+
+O Claude não pode inventar, estimar ou reutilizar valores do exemplo para preencher campos ausentes.
+
+Se um dado obrigatório não existir nos documentos reais, interromper e informar qual dado está faltando.
+
+## R5. Metodologia de margem
+
+A metodologia de margem atualmente utilizada pelo modelo oficial deve ser preservada:
+
+`Resultado bruto = Vendas - Compras`
+
+`Margem = Resultado bruto / Compras × 100`
+
+Não alterar essa metodologia sem instrução expressa.
+
+Não substituir por margem sobre vendas, margem líquida ou qualquer outra definição.
+
+## R6. Faixa e alíquota efetiva do Simples Nacional
+
+A faixa e a alíquota efetiva do Simples Nacional devem ser obtidas prioritariamente do PGDAS real.
+
+Não inferir faixa tributária a partir do gráfico, do histórico de vendas ou de cálculos próprios se o PGDAS fornecer essa informação.
+
+Somente quando o PGDAS não trouxer o dado é que se pode recorrer a outra fonte documental, informando explicitamente a origem utilizada.
+
+## R7. Execução do gerador
+
+Após produzir o JSON real, executar o gerador no formato:
+
+`python .claude/skills/fiscal/scripts/gerar_relatorio.py dados_relatorio.json relatorio_fiscal.pdf`
+
+O primeiro argumento é o JSON real construído conforme R3.
+
+O segundo argumento é o PDF de saída, que depois deve ser renomeado conforme a regra de nome do relatório.
+
+## R8. Validação pós-geração
+
+Depois da geração, validar obrigatoriamente:
+
+- PDF criado;
+- exatamente uma página;
+- razão social correta;
+- competência correta;
+- valores correspondentes aos dados extraídos.
+
+Se qualquer um desses itens falhar, o relatório não pode ser considerado gerado nem distribuído.
+
+## R9. Proteção dos recursos da Skill
+
+Não alterar, sem instrução expressa do usuário:
+
+- `.claude/skills/fiscal/scripts/gerar_relatorio.py`;
+- `.claude/skills/fiscal/references/exemplo-dados.json`;
+- `.claude/skills/fiscal/references/modelo-relatorio-fiscal.pdf`;
+- `requirements.txt`.
+
+Todas as demais regras deste SKILL.md permanecem válidas e devem ser aplicadas em conjunto com esta seção.
+
+---
+
 # 2. REGRA DE COMPETÊNCIA
 
 O Departamento Fiscal trabalha sempre com a competência anterior ao mês de processamento.
