@@ -101,6 +101,6 @@ O modelo é referência visual, nunca fonte de valores: nenhum nome, número, co
 
 O script usa **Pillow** para desenhar o PNG. A dependência ainda não está declarada em `requirements.txt`, que hoje contém apenas `reportlab` (usado pela Skill Fiscal para PDF). Incluir `Pillow` em `requirements.txt` depende de instrução expressa do usuário.
 
-## Arquivos previstos
+## Referência visual
 
-- `modelo-relatorio-procuradoria.png` em `../references/` — referência visual oficial, ainda não versionada. O layout atual segue a especificação da seção 16 do `SKILL.md`.
+- `../references/modelo-relatorio-procuradoria.png` — modelo visual oficial (900×1257 px), versionado no repositório. A geometria e a paleta deste gerador foram extraídas dele.
