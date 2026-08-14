@@ -858,20 +858,19 @@ def gerar_pdf(dados, arquivo_saida):
 
     vendas = float(dados.get("vendas") or dados.get("receita_mes") or 0)
 
-    # A natureza vem da planilha permanente (seção 7A): apenas empresa de
-    # SERVIÇO pode ficar sem compras aplicáveis. Nesse caso os campos
-    # baseados em compras exibem NÃO SE APLICA — nunca um R$ 0,00
-    # fabricado e nunca Resultado = Receita - 0.
-    compras_raw = dados.get("compras")
-    compras_aplicavel = compras_raw not in (None, "")
+    if servico:
+        # EMPRESA DE SERVIÇO — seção 7A do SKILL.md.
+        #
+        # Compras, Resultado bruto e Margem são OMITIDOS integralmente: a
+        # coluna COMPRA da planilha não é lida, nenhum cálculo derivado de
+        # compras é feito e nada é substituído por zero ou por texto de
+        # preenchimento (nem mesmo "NÃO SE APLICA"). A linha é remontada
+        # apenas com os indicadores que existem de fato, ocupando toda a
+        # largura útil.
+        indicadores = [("Saídas (Vendas)", moeda(vendas))]
 
-    if servico and not compras_aplicavel:
-        indicadores = [
-            ("Entradas (Compras)", "NÃO SE APLICA"),
-            ("Saídas (Vendas)", moeda(vendas)),
-            ("Resultado bruto", "NÃO SE APLICA"),
-            ("Margem", "NÃO SE APLICA"),
-        ]
+        if dados.get("rbt12") not in (None, ""):
+            indicadores.append(("RBT12", moeda(dados.get("rbt12"))))
     else:
         # EMPRESA DE COMÉRCIO — comportamento histórico, inalterado.
         compras = float(dados.get("compras") or 0)
