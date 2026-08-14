@@ -22,8 +22,8 @@ Codigos de saida:
 
     0  relatorio gerado
     1  erro (JSON invalido, arquivo ausente, falha de escrita)
-    2  contribuinte sem debito, pendencia ou alerta — relatorio nao deve ser
-       gerado (secao 4 do SKILL.md)
+    2  nenhuma condicao financeira identificada — relatorio nao deve ser gerado
+       (secao 4 do SKILL.md: alerta sozinho nao gera relatorio)
 """
 
 import json
@@ -847,10 +847,7 @@ def render_content(p, data):
             segments.append((texto, f_prose, ALERT_INK))
         y = render_prose_card(p, y, segments, ALERT_BG, bar=ALERT_BAR)
 
-    tem_debito = bool(
-        em_atraso or em_exigibilidade or parcelamentos or pgfn_com_divida(pgfn)
-    )
-    if tem_debito:
+    if tem_condicao_financeira(data):
         # O total do JSON prevalece; na ausencia dele, soma-se apenas o que ja
         # foi apurado nos blocos, uma unica vez cada.
         total = as_number(data.get("total_geral"))
@@ -861,15 +858,29 @@ def render_content(p, data):
     return draw_footer(p, y - BLOCK_GAP + 8)
 
 
-def tem_conteudo(data):
-    """Secao 4: contribuinte totalmente regular nao gera relatorio."""
+def parcelamento_conta_como_divida(item):
+    """Parcelamento so justifica relatorio quando ha parcela em atraso.
+
+    A quantidade de parcelas atrasadas basta, mesmo sem valor conhecido
+    (secao 4). Um valor conhecido tambem caracteriza obrigacao financeira.
+    """
+    atrasadas = as_int(first_key(item, "parcelas_atrasadas", "parcelas", "quantidade"))
+    if atrasadas is not None and atrasadas > 0:
+        return True
+    return as_number(first_key(item, "valor_total", "valor")) is not None
+
+
+def tem_condicao_financeira(data):
+    """Secao 4: so estas quatro condicoes justificam o relatorio.
+
+    ALERTA SOZINHO NAO GERA RELATORIO — alertas apenas complementam um
+    relatorio ja justificado por divida.
+    """
     if as_list(data.get("em_atraso")):
         return True
     if as_list(data.get("em_exigibilidade")):
         return True
-    if as_list(data.get("parcelamentos")):
-        return True
-    if as_list(data.get("alertas")):
+    if any(parcelamento_conta_como_divida(p) for p in as_list(data.get("parcelamentos"))):
         return True
     pgfn = data.get("pgfn") if isinstance(data.get("pgfn"), dict) else {}
     return pgfn_com_divida(pgfn)
@@ -927,11 +938,12 @@ def main(argv):
         sys.stderr.write("ERRO: o JSON deve conter um objeto na raiz.\n")
         return 1
 
-    if not tem_conteudo(dados):
+    if not tem_condicao_financeira(dados):
         sys.stderr.write(
-            "SEM RELATORIO: nenhum debito, parcelamento, divida na PGFN ou alerta "
-            "informado. Conforme a secao 4 do SKILL.md, contribuinte regular nao "
-            "gera Relatorio de Procuradoria.\n"
+            "SEM RELATORIO: nenhuma condicao financeira identificada (debito em "
+            "atraso, debito em exigibilidade, divida na PGFN ou parcelamento com "
+            "parcelas em atraso). Conforme a secao 4 do SKILL.md, alerta sozinho "
+            "nao gera Relatorio de Procuradoria.\n"
         )
         return 2
 

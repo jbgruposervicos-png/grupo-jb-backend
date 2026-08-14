@@ -76,7 +76,40 @@ Não inventar informação a partir de imagem ilegível, cortada ou sem contexto
 
 NÃO gerar relatório para contribuinte totalmente regular.
 
-Somente gerar Relatório de Procuradoria quando houver débito, pendência financeira ou obrigação em exigibilidade relevante identificada.
+Somente gerar Relatório de Procuradoria quando houver pelo menos UMA destas condições financeiras identificadas:
+
+- débito em atraso;
+- débito em exigibilidade / a vencer;
+- dívida na PGFN;
+- parcelamento com parcelas em atraso.
+
+## ALERTA SOZINHO NÃO GERA RELATÓRIO
+
+Alerta não é condição financeira.
+
+Alertas apenas COMPLEMENTAM um relatório já justificado pela existência de dívida.
+
+Não geram relatório isoladamente:
+
+- Termo de Exclusão sem dívida identificada;
+- print do e-CAC com aviso, mas sem dívida;
+- alerta de certidão sem dívida;
+- qualquer outro alerta complementar sem obrigação financeira identificada.
+
+Havendo alerta e nenhuma das quatro condições financeiras acima, encerrar aquele contribuinte sem gerar PNG e sem distribuir.
+
+## PARCELAMENTO COM PARCELAS EM ATRASO
+
+Parcelamento com parcelas em atraso conta como condição financeira MESMO quando o valor das parcelas não estiver disponível.
+
+Nesse caso:
+
+- pode gerar relatório;
+- informar a quantidade de parcelas;
+- não inventar valor;
+- não somar valor desconhecido ao TOTAL GERAL.
+
+## CONTRIBUINTE REGULAR
 
 Se a Situação Fiscal estiver regular:
 
@@ -301,6 +334,8 @@ Alertas só podem surgir de:
 
 Não criar alertas livremente.
 
+Alerta nunca justifica, sozinho, a geração do relatório: ele apenas complementa um relatório já justificado por condição financeira, conforme a seção 4.
+
 Possíveis alertas incluem:
 
 - parcelamento em risco, somente com mensagem do e-CAC;
@@ -354,6 +389,18 @@ O conteúdo é dinâmico.
 Blocos inexistentes não devem gerar espaços vazios desnecessários.
 
 O PNG pode crescer verticalmente quando necessário.
+
+## DECISÕES VISUAIS DEFINITIVAS
+
+As regras abaixo estão decididas e não são mais objeto de dúvida:
+
+- EM EXIGIBILIDADE / A VENCER = AMARELO;
+- se não houver débito a vencer, o bloco não aparece;
+- TOTAL GERAL = destaque VERMELHO.
+
+Estas regras da Skill PREVALECEM mesmo que o modelo visual de referência apresente pequenas diferenças.
+
+O modelo é referência de layout, não fonte de regra nem fonte de valores.
 
 ---
 
@@ -488,6 +535,7 @@ Nunca:
 - inventar risco de parcelamento;
 - inventar risco de exclusão do Simples;
 - interpretar aviso genérico como aviso individual;
+- gerar relatório sem condição financeira identificada, apenas por existir alerta;
 - duplicar dívida no total;
 - escolher destino incerto;
 - alterar documentos originais;
@@ -497,14 +545,56 @@ Nunca:
 
 # 24. IMPLEMENTAÇÃO
 
-Nesta etapa, existe apenas a estrutura da Skill e este SKILL.md.
+## Gerador oficial
 
-Ainda NÃO existem:
+O script oficial responsável pela geração do PNG é:
 
-- `gerar_relatorio_procuradoria.py`;
+`.claude/skills/procuradoria/scripts/gerar_relatorio_procuradoria.py`
+
+Esse script é a ÚNICA forma autorizada de produzir o Relatório de Procuradoria.
+
+Não produzir o PNG manualmente nem por caminho paralelo (HTML, impressão, desenho ad hoc ou outra biblioteca) quando o script estiver disponível.
+
+Se o script estiver comprovadamente indisponível, interromper aquele contribuinte e informar o problema — nunca improvisar um gerador paralelo.
+
+## Execução
+
+Antes de executar, construir um JSON contendo SOMENTE dados já extraídos e validados da Situação Fiscal e dos documentos complementares.
+
+Campo sem origem comprovada nesses documentos deve ficar ausente ou nulo, nunca preenchido por conveniência.
+
+Executar no formato:
+
+`python .claude/skills/procuradoria/scripts/gerar_relatorio_procuradoria.py dados.json saida.png`
+
+O segundo argumento é o PNG de saída, que depois deve ser renomeado conforme a regra de nome da seção 15.
+
+A estrutura do JSON e os códigos de saída estão documentados em `.claude/skills/procuradoria/scripts/README.md`.
+
+## Códigos de saída
+
+- `0` — relatório gerado;
+- `1` — erro (argumentos inválidos, JSON ausente ou inválido, falha de escrita);
+- `2` — nenhuma condição financeira identificada: relatório NÃO deve ser gerado, conforme a seção 4.
+
+O código `2` não é falha. É a aplicação da regra de que contribuinte sem dívida encerra silenciosamente, sem PNG e sem distribuição.
+
+## Dependência
+
+A dependência necessária está declarada em `requirements.txt` (`Pillow`).
+
+## Ainda não implementado
+
 - Routine;
-- alteração em `requirements.txt`.
-
-Enquanto o gerador oficial não existir, não improvisar um gerador paralelo nem produzir o PNG à mão: registrar que a etapa de geração ainda não está implementada.
+- leitura automática da Situação Fiscal (PDF/PNG);
+- distribuição automática no Google Drive.
 
 Esses itens serão criados em etapas posteriores, mediante instrução expressa do usuário.
+
+## Proteção dos recursos da Skill
+
+Não alterar, sem instrução expressa do usuário:
+
+- `.claude/skills/procuradoria/scripts/gerar_relatorio_procuradoria.py`;
+- `.claude/skills/procuradoria/references/modelo-relatorio-procuradoria.png`;
+- `requirements.txt`.
