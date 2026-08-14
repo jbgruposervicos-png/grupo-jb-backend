@@ -75,12 +75,27 @@ Cada inscrição da PGFN aceita `numero` e `valor`. Valores podem vir como núme
 ### Regras de renderização
 
 - Bloco cujo array esteja vazio ou ausente **não é renderizado** e não deixa espaço vazio.
-- `pgfn.status = "sem_divida"` → bloco **verde**; `"com_divida"` → bloco **vermelho** com inscrições resumidas.
+- `pgfn.status = "sem_divida"` → bloco **verde** compacto; `"com_divida"` → bloco **vermelho** com inscrições resumidas; qualquer outro valor (ou ausência) → bloco **não renderizado**, porque nada foi comprovado.
 - Várias inscrições na PGFN são agrupadas em quantidade + valor total (seção 11).
-- `TOTAL GERAL` em vermelho sempre que houver qualquer débito, parcelamento ou dívida na PGFN.
+- `TOTAL GERAL` em vermelho sempre que houver qualquer débito, parcelamento ou dívida na PGFN. Contribuinte só com alerta não gera Total Geral.
 - Se `total_geral` estiver ausente, o script soma **apenas** os subtotais já apurados nos blocos, cada um uma única vez.
-- Valor nulo ou ausente aparece como `valor não informado`, nunca como `R$ 0,00`, e **não** entra no total. Quando isso ocorre, uma observação abaixo do total registra que valores não informados não foram somados.
-- O PNG tem largura fixa de 1100 px e altura dinâmica, crescendo conforme a quantidade de blocos.
+- Valor nulo ou ausente exibe `—` na coluna de valor e a observação `valor não informado` na linha, nunca `R$ 0,00`, e **não** entra no total. Quando isso ocorre, uma nota abaixo do total registra que valores não informados não foram somados, e o subtotal do bloco recebe o sufixo `(SOMENTE VALORES INFORMADOS)`.
+- Subtotal de bloco e resumo de quantidade só aparecem quando o bloco tem duas linhas ou mais — com uma única linha repetiriam o próprio conteúdo.
+- O PNG tem largura fixa de 900 px (a mesma do modelo oficial) e altura dinâmica, crescendo conforme a quantidade de blocos.
+
+### Fidelidade ao modelo oficial
+
+O layout reproduz `../references/modelo-relatorio-procuradoria.png`: fundo `#EEF1F5`, folha branca arredondada com sombra suave, cabeçalho azul `#12355B` alinhado à borda dos cards, blocos com fundo tingido e borda de 2 px na cor do tema, linhas divisórias finas entre itens, subtotal destacado ao pé do bloco e rodapé centralizado.
+
+Três pontos divergem do modelo **por exigência das regras do `SKILL.md`**:
+
+| Ponto | Modelo | Gerador | Motivo |
+| --- | --- | --- | --- |
+| Exigibilidade / a vencer | bloco azul | bloco **amarelo** | Seção 6 do `SKILL.md` define amarelo |
+| Bloco de "a vencer" vazio | exibe "nenhuma guia a vencer" | **não renderiza** | Bloco inexistente não deve deixar espaço |
+| Total Geral | não existe (só o total do bloco) | faixa **vermelha** ao pé | Seções 12 e 16 exigem Total Geral em vermelho |
+
+O modelo é referência visual, nunca fonte de valores: nenhum nome, número, competência ou texto do exemplo é reaproveitado.
 
 ### Dependência
 

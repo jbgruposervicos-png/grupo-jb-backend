@@ -9,6 +9,12 @@ O script renderiza um PNG vertical de altura dinamica a partir de um unico
 arquivo JSON. Ele NAO le PDF, NAO le imagens, NAO acessa o Google Drive e NAO
 infere nenhum dado: tudo que aparece no relatorio vem do JSON de entrada.
 
+O layout segue o modelo visual oficial em
+`.claude/skills/procuradoria/references/modelo-relatorio-procuradoria.png`:
+fundo cinza-azulado, folha branca arredondada com sombra suave, cabecalho azul
+escuro, blocos com fundo tingido e borda na cor do tema, linhas divisorias
+finas entre os itens e subtotal destacado ao pe de cada bloco.
+
 Valores ausentes ou nulos nunca sao substituidos por zero nem estimados — sao
 apresentados como nao informados e ficam fora do total.
 
@@ -25,7 +31,7 @@ import os
 import sys
 
 try:
-    from PIL import Image, ImageDraw, ImageFont
+    from PIL import Image, ImageDraw, ImageFilter, ImageFont
 except ImportError:  # pragma: no cover - depende do ambiente
     sys.stderr.write(
         "ERRO: a biblioteca Pillow e necessaria para gerar o PNG.\n"
@@ -35,37 +41,55 @@ except ImportError:  # pragma: no cover - depende do ambiente
 
 
 # ---------------------------------------------------------------------------
-# Paleta e metricas
+# Geometria e paleta, medidas sobre o modelo oficial (900 px de largura)
 # ---------------------------------------------------------------------------
 
-WIDTH = 1100
-MARGIN = 48
-CONTENT_W = WIDTH - 2 * MARGIN
+WIDTH = 900
+PAGE_PAD = 30
 
-PAGE_BG = "#FFFFFF"
-INK = "#1B2430"
-INK_SOFT = "#5A6675"
-HAIRLINE = "#E4E9EF"
+SHEET_X0 = PAGE_PAD
+SHEET_X1 = WIDTH - PAGE_PAD
+SHEET_RADIUS = 18
 
-NAVY = "#0F2E5C"
-NAVY_EYEBROW = "#9FBBDF"
-NAVY_META = "#CBDDF2"
+CARD_INSET = 36
+CARD_X0 = SHEET_X0 + CARD_INSET
+CARD_X1 = SHEET_X1 - CARD_INSET
+CARD_RADIUS = 10
+CARD_PAD_X = 27
+CARD_PAD_TOP = 22
+CARD_PAD_BOTTOM = 20
 
-# Cada tema: (barra de destaque, fundo do bloco, linha divisoria, cor do titulo)
-THEME_RED = ("#C0392B", "#FCEDEB", "#F0C9C3", "#A5291C")
-THEME_AMBER = ("#E0A526", "#FFF8E7", "#F3E0B4", "#8A6100")
-THEME_GREEN = ("#1E8A4C", "#EAF7EF", "#C3E5D1", "#166B3B")
-THEME_NEUTRAL = ("#5B7FA6", "#F1F5F9", "#D8E2EC", "#2E4C6D")
+HEADER_INSET = 3
+HEADER_RADIUS = 14
 
-TOTAL_BG = "#B32B1E"
+BLOCK_GAP = 21
+HEADER_GAP = 31
+ROW_PAD_Y = 13
+BAR_W = 6
 
-CARD_RADIUS = 12
-ACCENT_W = 8
-CARD_PAD_X = 28
-CARD_PAD_TOP = 24
-CARD_PAD_BOTTOM = 26
-ROW_PAD_Y = 16
-BLOCK_GAP = 24
+PAGE_BG = "#EEF1F5"
+SHEET_BG = "#FFFFFF"
+SHADOW = (92, 106, 126, 52)
+
+NAVY = "#12355B"
+NAVY_EYEBROW = "#8FA8C4"
+NAVY_META = "#AFC6DE"
+
+INK = "#2B2B2B"
+MUTED = "#8A8F98"
+FOOTER_INK = "#7C8898"
+
+# Tema: (fundo, borda, divisoria, divisoria forte, titulo, valor, subtitulo)
+THEME_RED = ("#FDECEC", "#E8B4B4", "#F0DADA", "#DFC4C4", "#A5292A", "#C0392B", "#96706F")
+THEME_AMBER = ("#FDF3E3", "#EFD3A0", "#F3E6CC", "#E7D3AB", "#8A5B00", "#B37700", "#8F7648")
+THEME_GREEN = ("#EAF6EE", "#B6DDC4", "#D5EADD", "#C2DFCE", "#1F6B41", "#1F6B41", "#6D8A79")
+THEME_BLUE = ("#EAF2FB", "#B7D0EA", "#D8E6F4", "#C6D9EC", "#1F4E7A", "#1F4E7A", "#6C8299")
+
+ALERT_BAR = "#E8A317"
+ALERT_BG = "#FDF3E3"
+ALERT_INK = "#33312C"
+
+TOTAL_BG = "#C0392B"
 
 FONT_DIRS = (
     "/usr/share/fonts/truetype/dejavu",
@@ -104,6 +128,21 @@ def line_height(f):
         return ascent + descent
     except AttributeError:  # fonte bitmap de fallback
         return f.size + 4
+
+
+def has_glyph(f, char):
+    """Detecta se a fonte possui o caractere, comparando com um vazio conhecido.
+
+    Evita que icones virem quadrados de .notdef em ambientes sem DejaVu.
+    """
+    try:
+        return f.getmask(char).getbbox() != f.getmask("\ue000").getbbox()
+    except Exception:
+        return False
+
+
+def icon(f, char):
+    return char + " " if has_glyph(f, char) else ""
 
 
 # ---------------------------------------------------------------------------
@@ -177,6 +216,21 @@ def plural(count, singular, many):
     return singular if count == 1 else many
 
 
+def documento_label(documento):
+    """Prefixa CNPJ ou CPF conforme a quantidade de digitos ja presente."""
+    texto = as_text(documento)
+    if not texto:
+        return ""
+    if texto.upper().startswith(("CNPJ", "CPF")):
+        return texto
+    digitos = sum(1 for c in texto if c.isdigit())
+    if digitos == 14:
+        return "CNPJ " + texto
+    if digitos == 11:
+        return "CPF " + texto
+    return texto
+
+
 # ---------------------------------------------------------------------------
 # Pintor com modo de medicao
 # ---------------------------------------------------------------------------
@@ -202,9 +256,11 @@ class Painter:
         if not self.dry:
             self._draw.rectangle(box, fill=fill)
 
-    def round_rect(self, box, radius, fill):
+    def round_rect(self, box, radius, fill=None, outline=None, width=1):
         if not self.dry:
-            self._draw.rounded_rectangle(box, radius=radius, fill=fill)
+            self._draw.rounded_rectangle(
+                box, radius=radius, fill=fill, outline=outline, width=width
+            )
 
     def text(self, xy, content, f, fill, anchor="la"):
         if not self.dry:
@@ -215,6 +271,12 @@ class Painter:
         for char in content:
             self.text((x, y), char, f, fill)
             x += self._draw.textlength(char, font=f) + spacing
+        return x
+
+    def spaced_width(self, content, f, spacing):
+        return sum(self._draw.textlength(c, font=f) for c in content) + spacing * len(
+            content
+        )
 
     def width_of(self, content, f):
         return self._draw.textlength(content, font=f)
@@ -236,171 +298,270 @@ class Painter:
         lines.append(current)
         return lines
 
-    def paragraph(self, x, y, content, f, fill, max_width, leading=6):
+    def paragraph(self, x, y, content, f, fill, max_width, leading=7):
         for line in self.wrap(content, f, max_width):
             self.text((x, y), line, f, fill)
             y += line_height(f) + leading
         return y - leading
 
+    def rich(self, x, y, segments, max_width, leading=7):
+        """Escreve trechos com fontes/cores diferentes fluindo na mesma linha.
+
+        Usado nos alertas e na linha da PGFN, onde o modelo mistura negrito e
+        texto corrido dentro do mesmo paragrafo.
+        """
+        segments = [s for s in segments if s[0]]
+        if not segments:
+            return y
+        alt = max(line_height(f) for _, f, _ in segments)
+        cursor = x
+        for content, f, fill in segments:
+            space = self.width_of(" ", f)
+            for word in content.split():
+                w = self.width_of(word, f)
+                if cursor > x and cursor + w > x + max_width:
+                    cursor = x
+                    y += alt + leading
+                self.text((cursor, y), word, f, fill)
+                cursor += w + space
+        return y + alt
+
 
 # ---------------------------------------------------------------------------
-# Blocos do relatorio
+# Cabecalho
 # ---------------------------------------------------------------------------
 
 
 def draw_header(p, y, data):
-    """Cabecalho azul escuro, sangrando de borda a borda."""
-    f_eyebrow = font(19, bold=True)
-    f_name = font(40, bold=True)
-    f_meta = font(21)
+    """Bloco azul escuro no topo da folha, com nome, documento e data."""
+    f_eyebrow = font(12, bold=True)
+    f_name = font(26, bold=True)
+    f_meta = font(14)
 
-    pad_top, pad_bottom = 38, 34
-    x = MARGIN
-    inner_y = y + pad_top
+    x0 = SHEET_X0 + HEADER_INSET
+    x1 = SHEET_X1 - HEADER_INSET
+    text_x = CARD_X0
+    text_w = CARD_X1 - text_x
 
     nome = as_text(data.get("nome")) or "CONTRIBUINTE NÃO INFORMADO"
-    name_lines = p.wrap(nome.upper(), f_name, CONTENT_W)
+    name_lines = p.wrap(nome.upper(), f_name, text_w)
 
     meta_parts = []
-    documento = as_text(data.get("documento"))
+    documento = documento_label(data.get("documento"))
     if documento:
         meta_parts.append(documento)
+    data_relatorio = as_text(data.get("data_relatorio"))
     competencia = as_text(data.get("competencia")) or as_text(
         data.get("referencia_mes_ano")
     ).replace("-", "/")
-    if competencia:
+    if data_relatorio:
+        meta_parts.append(data_relatorio)
+    elif competencia:
         meta_parts.append("Competência {}".format(competencia))
 
-    # Altura do bloco precisa ser conhecida antes de pintar o fundo.
-    height = pad_top + line_height(f_eyebrow) + 18
-    height += len(name_lines) * (line_height(f_name) + 6) - 6
+    height = 24 + line_height(f_eyebrow) + 12
+    height += len(name_lines) * (line_height(f_name) + 4) - 4
     if meta_parts:
-        height += 16 + line_height(f_meta)
-    height += pad_bottom
+        height += 9 + line_height(f_meta)
+    height += 26
 
-    p.rect((0, y, WIDTH, y + height), NAVY)
+    p.round_rect((x0, y, x1, y + height), HEADER_RADIUS, fill=NAVY)
 
-    p.spaced_text((x, inner_y), "RELATÓRIO DE PROCURADORIA", f_eyebrow, NAVY_EYEBROW, 2.5)
-    inner_y += line_height(f_eyebrow) + 18
+    inner = y + 24
+    p.spaced_text((text_x, inner), "SITUAÇÃO FISCAL", f_eyebrow, NAVY_EYEBROW, 1.6)
+    inner += line_height(f_eyebrow) + 12
 
     for line in name_lines:
-        p.text((x, inner_y), line, f_name, "#FFFFFF")
-        inner_y += line_height(f_name) + 6
+        p.text((text_x, inner), line, f_name, "#FFFFFF")
+        inner += line_height(f_name) + 4
 
     if meta_parts:
-        inner_y += 10
-        p.text((x, inner_y), "   |   ".join(meta_parts), f_meta, NAVY_META)
+        inner += 5
+        p.text((text_x, inner), "   ·   ".join(meta_parts), f_meta, NAVY_META)
 
     return y + height
 
 
-def draw_card(p, y, theme, title, rows, subtitle=None, paragraphs=None):
-    """Desenha um bloco com barra de destaque, titulo, subtotal e linhas.
+# ---------------------------------------------------------------------------
+# Blocos com linhas (atraso, exigibilidade, parcelamentos, PGFN com divida)
+# ---------------------------------------------------------------------------
 
-    `rows` e uma lista de dicts com as chaves opcionais label, sub e value.
-    `paragraphs` e uma lista de (titulo, texto) usada pelos alertas.
-    """
-    accent, bg, line_color, title_color = theme
-    rows = rows or []
-    paragraphs = paragraphs or []
 
-    # Com uma unica linha o subtotal repetiria o valor da propria linha.
-    if len(rows) < 2:
-        subtitle = None
+def draw_rows_card(p, y, theme, title, subtitle, rows, total_label, total_value):
+    """Card tingido com titulo, itens e subtotal ao pe, no estilo do modelo."""
+    bg, border, divider, divider_strong, title_ink, value_ink, sub_ink = theme
 
-    f_title = font(25, bold=True)
-    f_subtitle = font(23, bold=True)
-    f_label = font(22, bold=True)
-    f_sub = font(18)
-    f_value = font(24, bold=True)
-    f_ptitle = font(21, bold=True)
-    f_ptext = font(19)
+    f_title = font(15, bold=True)
+    f_subtitle = font(12)
+    f_row = font(15)
+    f_small = font(12)
+    f_value = font(16, bold=True)
+    f_total_label = font(13, bold=True)
+    f_total_value = font(27, bold=True)
 
-    x1, x2 = MARGIN, WIDTH - MARGIN
-    text_x = x1 + ACCENT_W + CARD_PAD_X
-    text_right = x2 - CARD_PAD_X
+    text_x = CARD_X0 + CARD_PAD_X
+    text_right = CARD_X1 - CARD_PAD_X
     text_w = text_right - text_x
 
     cursor = y + CARD_PAD_TOP
 
-    # Titulo do bloco e subtotal alinhado a direita.
-    p.text((text_x, cursor), title, f_title, title_color)
-    if subtitle:
-        p.text((text_right, cursor + 2), subtitle, f_subtitle, title_color, anchor="ra")
-    cursor += line_height(f_title) + 16
+    marca = icon(f_title, "\u26a0") if theme is THEME_RED else ""
+    p.spaced_text((text_x, cursor), marca + title, f_title, title_ink, 0.6)
+    cursor += line_height(f_title)
 
-    if rows or paragraphs:
-        p.rect((text_x, cursor, text_right, cursor + 1), line_color)
-        cursor += 1
+    if subtitle:
+        cursor += 6
+        p.text((text_x, cursor), subtitle, f_subtitle, sub_ink)
+        cursor += line_height(f_subtitle)
+
+    cursor += 14
 
     for index, row in enumerate(rows):
         if index:
-            p.rect((text_x, cursor, text_right, cursor + 1), line_color)
+            p.rect((text_x, cursor, text_right, cursor + 1), divider)
             cursor += 1
         cursor += ROW_PAD_Y
-        row_top = cursor
 
-        label = row.get("label") or ""
-        sub = row.get("sub")
         value = row.get("value")
+        value_w = p.width_of(value, f_value) + 24 if value else 0
 
-        value_w = p.width_of(value, f_value) + 28 if value else 0
-        label_lines = p.wrap(label, f_label, max(text_w - value_w, 120))
+        segments = [(row.get("label") or "", f_row, INK)]
+        if row.get("sub"):
+            segments.append(("   ·   ", f_row, MUTED))
+            segments.append((row["sub"], f_row, INK))
+        if row.get("note"):
+            segments.append(("  " + row["note"], f_small, MUTED))
 
-        block_h = len(label_lines) * (line_height(f_label) + 4) - 4
-        if sub:
-            block_h += 6 + line_height(f_sub)
-
-        line_y = cursor
-        for line in label_lines:
-            p.text((text_x, line_y), line, f_label, INK)
-            line_y += line_height(f_label) + 4
-        if sub:
-            p.text((text_x, line_y + 2), sub, f_sub, INK_SOFT)
-
+        bottom = p.rich(text_x, cursor, segments, max(text_w - value_w, 140))
         if value:
             p.text(
-                (text_right, row_top + block_h / 2),
+                (text_right, (cursor + bottom) / 2),
                 value,
                 f_value,
-                title_color,
+                row.get("value_ink") or value_ink,
                 anchor="rm",
             )
+        cursor = bottom + ROW_PAD_Y
 
-        cursor = row_top + block_h + ROW_PAD_Y
-
-    for index, (ptitle, ptext) in enumerate(paragraphs):
-        if index:
-            p.rect((text_x, cursor, text_right, cursor + 1), line_color)
-            cursor += 1
-        cursor += ROW_PAD_Y
-        if ptitle:
-            p.text((text_x, cursor), ptitle, f_ptitle, title_color)
-            cursor += line_height(f_ptitle) + 8
-        if ptext:
-            cursor = p.paragraph(text_x, cursor, ptext, f_ptext, INK, text_w)
-            cursor += line_height(f_ptext)
-        cursor += ROW_PAD_Y - 8
+    if total_value:
+        p.rect((text_x, cursor, text_right, cursor + 2), divider_strong)
+        cursor += 2 + 18
+        top = cursor
+        p.spaced_text((text_x, cursor + 6), total_label, f_total_label, title_ink, 0.6)
+        p.text(
+            (text_right, cursor + line_height(f_total_value) / 2 - 2),
+            total_value,
+            f_total_value,
+            value_ink,
+            anchor="rm",
+        )
+        cursor = top + line_height(f_total_value) + 4
 
     cursor += CARD_PAD_BOTTOM
-    height = cursor - y
-
-    # Pintado por ultimo em modo real seria coberto pelo texto, entao o fundo e
-    # desenhado antes; em modo dry nada e pintado e apenas a altura importa.
-    return height
+    return cursor - y
 
 
-def render_card(p, y, *args, **kwargs):
-    """Mede o card, pinta o fundo e so entao redesenha o conteudo por cima."""
-    height = draw_card(p.measuring(), y, *args, **kwargs)
+def render_rows_card(p, y, theme, *args, **kwargs):
+    height = draw_rows_card(p.measuring(), y, theme, *args, **kwargs)
     if not p.dry:
-        accent, bg = args[0][0], args[0][1]
-        p.round_rect((MARGIN, y, WIDTH - MARGIN, y + height), CARD_RADIUS, accent)
         p.round_rect(
-            (MARGIN + ACCENT_W, y, WIDTH - MARGIN, y + height), CARD_RADIUS, bg
+            (CARD_X0, y, CARD_X1, y + height),
+            CARD_RADIUS,
+            fill=theme[0],
+            outline=theme[1],
+            width=2,
         )
-        draw_card(p, y, *args, **kwargs)
+        draw_rows_card(p, y, theme, *args, **kwargs)
     return y + height + BLOCK_GAP
+
+
+# ---------------------------------------------------------------------------
+# Blocos de texto corrido (PGFN sem divida, alertas)
+# ---------------------------------------------------------------------------
+
+
+def draw_prose_card(p, y, segments, bg, border=None, bar=None):
+    """Card compacto de texto corrido, com borda ou com barra lateral."""
+    text_x = CARD_X0 + CARD_PAD_X + (BAR_W if bar else 0)
+    text_right = CARD_X1 - CARD_PAD_X
+    cursor = y + 18
+    cursor = p.rich(text_x, cursor, segments, text_right - text_x)
+    return cursor - y + 20
+
+
+def render_prose_card(p, y, segments, bg, border=None, bar=None):
+    height = draw_prose_card(p.measuring(), y, segments, bg, border, bar)
+    if not p.dry:
+        if bar:
+            p.round_rect((CARD_X0, y, CARD_X1, y + height), CARD_RADIUS, fill=bar)
+            p.round_rect(
+                (CARD_X0 + BAR_W, y, CARD_X1, y + height), CARD_RADIUS, fill=bg
+            )
+        else:
+            p.round_rect(
+                (CARD_X0, y, CARD_X1, y + height),
+                CARD_RADIUS,
+                fill=bg,
+                outline=border,
+                width=2,
+            )
+        draw_prose_card(p, y, segments, bg, border, bar)
+    return y + height + BLOCK_GAP
+
+
+# ---------------------------------------------------------------------------
+# Total geral e rodape
+# ---------------------------------------------------------------------------
+
+
+def draw_total(p, y, total, incompleto):
+    f_label = font(15, bold=True)
+    f_value = font(27, bold=True)
+    f_note = font(12)
+
+    height = 72
+    p.round_rect((CARD_X0, y, CARD_X1, y + height), CARD_RADIUS, fill=TOTAL_BG)
+    p.spaced_text(
+        (CARD_X0 + CARD_PAD_X, y + height / 2 - line_height(f_label) / 2),
+        "TOTAL GERAL",
+        f_label,
+        "#FFFFFF",
+        0.6,
+    )
+    p.text(
+        (CARD_X1 - CARD_PAD_X, y + height / 2),
+        total or "NÃO INFORMADO",
+        f_value,
+        "#FFFFFF",
+        anchor="rm",
+    )
+    y += height
+
+    if incompleto:
+        y += 10
+        y = p.paragraph(
+            CARD_X0 + 2,
+            y,
+            "Valores não informados nos documentos não foram somados ao total.",
+            f_note,
+            MUTED,
+            CARD_X1 - CARD_X0 - 4,
+        )
+
+    return y + BLOCK_GAP
+
+
+def draw_footer(p, y):
+    f = font(13)
+    y += 13
+    texto = "Base: Relatório de Situação Fiscal — Receita Federal / PGFN"
+    p.text(((CARD_X0 + CARD_X1) / 2, y), texto, f, FOOTER_INK, anchor="ma")
+    return y + line_height(f)
+
+
+# ---------------------------------------------------------------------------
+# Consolidacao dos dados em linhas
+# ---------------------------------------------------------------------------
 
 
 def rows_from_groups(groups, unit_singular, unit_plural):
@@ -409,11 +570,13 @@ def rows_from_groups(groups, unit_singular, unit_plural):
     known_total = 0.0
     has_known = False
     has_unknown = False
+    quantidade_total = 0
+    quantidade_conhecida = False
 
     for group in groups:
         tipo = as_text(first_key(group, "tipo", "grupo", "natureza", "origem"))
         if not tipo:
-            tipo = "NÃO INFORMADO"
+            tipo = "Não informado"
         quantidade = as_int(first_key(group, "quantidade", "qtd", "guias"))
         valor = as_number(first_key(group, "valor_total", "valor", "total"))
 
@@ -421,20 +584,36 @@ def rows_from_groups(groups, unit_singular, unit_plural):
             sub = "{} {}".format(
                 quantidade, plural(quantidade, unit_singular, unit_plural)
             )
+            quantidade_total += quantidade
+            quantidade_conhecida = True
         else:
             sub = None
 
-        value_text = brl(valor)
+        row = {"label": tipo, "sub": sub, "value": brl(valor)}
         if valor is None:
+            # Secao 23: valor desconhecido nunca vira zero nem entra no total.
             has_unknown = True
-            value_text = "valor não informado"
+            row["value"] = "—"
+            row["value_ink"] = MUTED
+            row["note"] = "valor não informado"
         else:
             known_total += valor
             has_known = True
+        rows.append(row)
 
-        rows.append({"label": tipo.upper(), "sub": sub, "value": value_text})
+    # Com um unico grupo o resumo repetiria a propria linha.
+    resumo = None
+    if quantidade_conhecida and len(rows) > 1:
+        resumo = "{} {}".format(
+            quantidade_total, plural(quantidade_total, unit_singular, unit_plural)
+        )
 
-    return rows, (known_total if has_known else None), has_unknown
+    return {
+        "rows": rows,
+        "subtotal": known_total if has_known else None,
+        "incompleto": has_unknown,
+        "resumo": resumo,
+    }
 
 
 def rows_from_parcelamentos(parcelamentos):
@@ -446,8 +625,10 @@ def rows_from_parcelamentos(parcelamentos):
     for item in parcelamentos:
         tipo = as_text(first_key(item, "tipo", "parcelamento", "descricao"))
         if not tipo:
-            tipo = "PARCELAMENTO NÃO IDENTIFICADO"
-        atrasadas = as_int(first_key(item, "parcelas_atrasadas", "parcelas", "quantidade"))
+            tipo = "Parcelamento não identificado"
+        atrasadas = as_int(
+            first_key(item, "parcelas_atrasadas", "parcelas", "quantidade")
+        )
         valor = as_number(first_key(item, "valor_total", "valor"))
 
         if atrasadas is not None:
@@ -457,38 +638,36 @@ def rows_from_parcelamentos(parcelamentos):
         else:
             sub = None
 
-        value_text = brl(valor)
+        row = {"label": tipo, "sub": sub, "value": brl(valor)}
         if valor is None:
-            # Secao 7: parcelamento sem valor comprovado e informado, mas nao somado.
+            # Secao 7: parcelamento sem valor comprovado e informado, nao somado.
             has_unknown = True
-            value_text = "valor não informado"
+            row["value"] = "—"
+            row["value_ink"] = MUTED
+            row["note"] = "valor não informado"
         else:
             known_total += valor
             has_known = True
+        rows.append(row)
 
-        rows.append({"label": tipo.upper(), "sub": sub, "value": value_text})
+    return {
+        "rows": rows,
+        "subtotal": known_total if has_known else None,
+        "incompleto": has_unknown,
+        "resumo": None,
+    }
 
-    return rows, (known_total if has_known else None), has_unknown
+
+def pgfn_status(pgfn):
+    return as_text(pgfn.get("status")).lower().replace("-", "_").replace(" ", "_")
 
 
-def pgfn_block(pgfn):
-    """Retorna (tema, titulo, rows, subtotal_conhecido, tem_desconhecido) ou None."""
-    status = as_text(pgfn.get("status")).lower().replace("-", "_").replace(" ", "_")
+def pgfn_com_divida(pgfn):
+    return pgfn_status(pgfn) in ("com_divida", "com_dividas", "inscrito", "irregular")
 
-    if status in ("sem_divida", "sem_dividas", "regular"):
-        rows = [
-            {
-                "label": "SEM DÍVIDAS NA PROCURADORIA",
-                "sub": "Nenhuma inscrição em dívida ativa identificada.",
-                "value": None,
-            }
-        ]
-        return THEME_GREEN, "PROCURADORIA / PGFN", rows, None, False
 
-    if status not in ("com_divida", "com_dividas", "inscrito", "irregular"):
-        # Status ausente ou desconhecido: nada foi comprovado, nada e afirmado.
-        return None
-
+def rows_from_pgfn(pgfn):
+    """Monta as linhas da divida ativa, resumindo quando ha varias inscricoes."""
     inscricoes = as_list(pgfn.get("inscricoes"))
     total_declarado = as_number(first_key(pgfn, "valor_total", "total", "valor"))
 
@@ -504,98 +683,55 @@ def pgfn_block(pgfn):
             has_known = True
 
     if len(inscricoes) == 1:
-        numero = as_text(
-            first_key(inscricoes[0], "numero", "inscricao", "n_inscricao")
-        )
+        numero = as_text(first_key(inscricoes[0], "numero", "inscricao", "n_inscricao"))
         valor = as_number(first_key(inscricoes[0], "valor", "valor_total", "total"))
-        label = "Inscrição: {}".format(numero) if numero else "Inscrição não informada"
         rows = [
             {
-                "label": label.upper(),
+                "label": "Inscrição {}".format(numero)
+                if numero
+                else "Inscrição não informada",
                 "sub": None,
-                "value": brl(valor) or "valor não informado",
+                "value": brl(valor),
             }
         ]
     elif len(inscricoes) > 1:
-        # Secao 11: varias inscricoes sao agrupadas por quantidade e valor total.
+        # Secao 11: varias inscricoes sao agrupadas em quantidade e valor total.
         rows = [
             {
-                "label": "DÍVIDA ATIVA INSCRITA",
+                "label": "Dívida ativa inscrita",
                 "sub": "{} inscrições".format(len(inscricoes)),
-                "value": brl(known_total if has_known else None)
-                or "valor não informado",
+                "value": brl(known_total if has_known else None),
             }
         ]
     else:
         rows = [
             {
-                "label": "DÉBITO NA PROCURADORIA",
-                "sub": "Inscrição e valor não informados nos documentos.",
-                "value": None,
+                "label": "Débito inscrito em dívida ativa",
+                "sub": None,
+                "value": brl(total_declarado),
             }
         ]
+        if total_declarado is None:
+            has_unknown = True
 
-    subtotal = total_declarado if total_declarado is not None else (
-        known_total if has_known else None
-    )
+    for row in rows:
+        if not row["value"]:
+            row["value"] = "—"
+            row["value_ink"] = MUTED
+            row["note"] = "valor não informado"
+
+    subtotal = total_declarado
+    if subtotal is None and has_known:
+        subtotal = known_total
     if total_declarado is not None:
         has_unknown = False
 
-    return THEME_RED, "PROCURADORIA / PGFN", rows, subtotal, has_unknown
-
-
-def draw_total(p, y, total, incompleto):
-    f_label = font(27, bold=True)
-    f_value = font(40, bold=True)
-    f_note = font(18)
-
-    height = 104
-    p.round_rect((MARGIN, y, WIDTH - MARGIN, y + height), CARD_RADIUS, TOTAL_BG)
-    p.text((MARGIN + 32, y + height / 2), "TOTAL GERAL", f_label, "#FFFFFF", anchor="lm")
-    p.text(
-        (WIDTH - MARGIN - 32, y + height / 2),
-        total or "NÃO INFORMADO",
-        f_value,
-        "#FFFFFF",
-        anchor="rm",
-    )
-    y += height
-
-    if incompleto:
-        y += 12
-        y = p.paragraph(
-            MARGIN + 4,
-            y,
-            "Valores não informados nos documentos não foram somados ao total.",
-            f_note,
-            INK_SOFT,
-            CONTENT_W - 8,
-        )
-        y += line_height(f_note)
-
-    return y + BLOCK_GAP
-
-
-def draw_footer(p, y, data):
-    f = font(17)
-    y += 8
-    p.rect((MARGIN, y, WIDTH - MARGIN, y + 1), HAIRLINE)
-    y += 18
-
-    parts = ["Grupo JB Contabilidade  |  Departamento de Procuradoria"]
-    data_relatorio = as_text(data.get("data_relatorio"))
-    if data_relatorio:
-        parts.append("Situação Fiscal de {}".format(data_relatorio))
-    p.text((MARGIN, y), "     ".join(parts), f, INK_SOFT)
-    y += line_height(f) + 6
-
-    p.text(
-        (MARGIN, y),
-        "Documento gerado a partir dos dados extraídos da Situação Fiscal e dos documentos complementares.",
-        f,
-        INK_SOFT,
-    )
-    return y + line_height(f) + 40
+    return {
+        "rows": rows,
+        "subtotal": subtotal,
+        "incompleto": has_unknown,
+        "resumo": None,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -603,11 +739,19 @@ def draw_footer(p, y, data):
 # ---------------------------------------------------------------------------
 
 
-def render(p, data):
-    """Desenha o relatorio inteiro e devolve a altura usada.
+def subtotal_para(bloco, rotulo):
+    """Subtotal do bloco so aparece quando ha mais de uma linha para somar."""
+    if len(bloco["rows"]) < 2 or bloco["subtotal"] is None:
+        return None, None
+    if bloco["incompleto"]:
+        rotulo += " (SOMENTE VALORES INFORMADOS)"
+    return rotulo, brl(bloco["subtotal"])
 
-    Blocos sem conteudo simplesmente nao avancam o cursor, entao nao sobra
-    espaco vazio na pagina.
+
+def render_content(p, data):
+    """Desenha o conteudo da folha e devolve o y final.
+
+    Blocos sem conteudo nao avancam o cursor, entao nao sobra espaco vazio.
     """
     em_atraso = as_list(data.get("em_atraso"))
     em_exigibilidade = as_list(data.get("em_exigibilidade"))
@@ -615,68 +759,97 @@ def render(p, data):
     alertas = as_list(data.get("alertas"))
     pgfn = data.get("pgfn") if isinstance(data.get("pgfn"), dict) else {}
 
-    y = draw_header(p, 0, data)
-    y += 32
+    f_prose = font(15)
+    f_prose_bold = font(15, bold=True)
+
+    y = draw_header(p, PAGE_PAD, data) + HEADER_GAP
 
     incompleto = False
     somas = []
 
     if em_atraso:
-        rows, subtotal, unknown = rows_from_groups(em_atraso, "guia em atraso", "guias em atraso")
-        incompleto = incompleto or unknown
-        if subtotal is not None:
-            somas.append(subtotal)
-        y = render_card(
-            p, y, THEME_RED, "DÉBITOS EM ATRASO", rows, subtitle=brl(subtotal)
+        bloco = rows_from_groups(em_atraso, "guia em atraso", "guias em atraso")
+        incompleto = incompleto or bloco["incompleto"]
+        if bloco["subtotal"] is not None:
+            somas.append(bloco["subtotal"])
+        rotulo, valor = subtotal_para(bloco, "TOTAL EM ATRASO")
+        y = render_rows_card(
+            p, y, THEME_RED, "EM ATRASO", bloco["resumo"], bloco["rows"], rotulo, valor
         )
 
     if em_exigibilidade:
-        rows, subtotal, unknown = rows_from_groups(
+        bloco = rows_from_groups(
             em_exigibilidade, "guia em exigibilidade", "guias em exigibilidade"
         )
-        incompleto = incompleto or unknown
-        if subtotal is not None:
-            somas.append(subtotal)
-        y = render_card(
+        incompleto = incompleto or bloco["incompleto"]
+        if bloco["subtotal"] is not None:
+            somas.append(bloco["subtotal"])
+        rotulo, valor = subtotal_para(bloco, "TOTAL EM EXIGIBILIDADE")
+        y = render_rows_card(
             p,
             y,
             THEME_AMBER,
             "EM EXIGIBILIDADE / A VENCER",
-            rows,
-            subtitle=brl(subtotal),
+            bloco["resumo"],
+            bloco["rows"],
+            rotulo,
+            valor,
         )
 
     if parcelamentos:
-        rows, subtotal, unknown = rows_from_parcelamentos(parcelamentos)
-        incompleto = incompleto or unknown
-        if subtotal is not None:
-            somas.append(subtotal)
-        y = render_card(
-            p, y, THEME_NEUTRAL, "PARCELAMENTOS", rows, subtitle=brl(subtotal)
+        bloco = rows_from_parcelamentos(parcelamentos)
+        incompleto = incompleto or bloco["incompleto"]
+        if bloco["subtotal"] is not None:
+            somas.append(bloco["subtotal"])
+        rotulo, valor = subtotal_para(bloco, "TOTAL PARCELADO")
+        y = render_rows_card(
+            p, y, THEME_BLUE, "PARCELAMENTOS", None, bloco["rows"], rotulo, valor
         )
 
-    bloco_pgfn = pgfn_block(pgfn)
-    pgfn_com_divida = False
-    if bloco_pgfn:
-        theme, titulo, rows, subtotal, unknown = bloco_pgfn
-        pgfn_com_divida = theme is THEME_RED
-        if pgfn_com_divida:
-            incompleto = incompleto or unknown
-            if subtotal is not None:
-                somas.append(subtotal)
-        y = render_card(p, y, theme, titulo, rows, subtitle=brl(subtotal))
+    if pgfn_com_divida(pgfn):
+        bloco = rows_from_pgfn(pgfn)
+        incompleto = incompleto or bloco["incompleto"]
+        if bloco["subtotal"] is not None:
+            somas.append(bloco["subtotal"])
+        rotulo, valor = subtotal_para(bloco, "TOTAL NA PROCURADORIA")
+        y = render_rows_card(
+            p,
+            y,
+            THEME_RED,
+            "DÉBITO NA PROCURADORIA",
+            None,
+            bloco["rows"],
+            rotulo,
+            valor,
+        )
+    elif pgfn_status(pgfn) in ("sem_divida", "sem_dividas", "regular"):
+        marca = icon(f_prose_bold, "\u2714")
+        y = render_prose_card(
+            p,
+            y,
+            [
+                (marca + "Sem dívidas na Procuradoria", f_prose_bold, THEME_GREEN[4]),
+                ("— nenhuma inscrição em dívida ativa foi identificada.", f_prose, INK),
+            ],
+            THEME_GREEN[0],
+            border=THEME_GREEN[1],
+        )
 
-    if alertas:
-        paragraphs = []
-        for alerta in alertas:
-            titulo = as_text(first_key(alerta, "titulo", "title", "alerta"))
-            texto = as_text(first_key(alerta, "texto", "descricao", "detalhe"))
-            if titulo or texto:
-                paragraphs.append((titulo.upper(), texto))
-        if paragraphs:
-            y = render_card(p, y, THEME_AMBER, "ALERTAS", [], paragraphs=paragraphs)
+    for alerta in alertas:
+        titulo = as_text(first_key(alerta, "titulo", "title", "alerta"))
+        texto = as_text(first_key(alerta, "texto", "descricao", "detalhe"))
+        if not (titulo or texto):
+            continue
+        segments = []
+        if titulo:
+            segments.append((titulo.rstrip(".") + ".", f_prose_bold, ALERT_INK))
+        if texto:
+            segments.append((texto, f_prose, ALERT_INK))
+        y = render_prose_card(p, y, segments, ALERT_BG, bar=ALERT_BAR)
 
-    tem_debito = bool(em_atraso or em_exigibilidade or pgfn_com_divida or parcelamentos)
+    tem_debito = bool(
+        em_atraso or em_exigibilidade or parcelamentos or pgfn_com_divida(pgfn)
+    )
     if tem_debito:
         # O total do JSON prevalece; na ausencia dele, soma-se apenas o que ja
         # foi apurado nos blocos, uma unica vez cada.
@@ -685,8 +858,7 @@ def render(p, data):
             total = sum(somas)
         y = draw_total(p, y, brl(total), incompleto)
 
-    y = draw_footer(p, y, data)
-    return int(y)
+    return draw_footer(p, y - BLOCK_GAP + 8)
 
 
 def tem_conteudo(data):
@@ -700,17 +872,35 @@ def tem_conteudo(data):
     if as_list(data.get("alertas")):
         return True
     pgfn = data.get("pgfn") if isinstance(data.get("pgfn"), dict) else {}
-    status = as_text(pgfn.get("status")).lower().replace("-", "_").replace(" ", "_")
-    return status in ("com_divida", "com_dividas", "inscrito", "irregular")
+    return pgfn_com_divida(pgfn)
 
 
 def gerar(dados, caminho_saida):
     measure = ImageDraw.Draw(Image.new("RGB", (1, 1)))
-    altura = render(Painter(measure, True), dados)
+    conteudo = render_content(Painter(measure, True), dados)
 
-    imagem = Image.new("RGB", (WIDTH, altura), PAGE_BG)
-    render(Painter(ImageDraw.Draw(imagem), False), dados)
-    imagem.save(caminho_saida, "PNG")
+    sheet_bottom = conteudo + 34
+    altura = int(sheet_bottom + PAGE_PAD)
+
+    imagem = Image.new("RGBA", (WIDTH, altura), PAGE_BG)
+
+    sombra = Image.new("RGBA", (WIDTH, altura), (0, 0, 0, 0))
+    ImageDraw.Draw(sombra).rounded_rectangle(
+        (SHEET_X0, PAGE_PAD + 4, SHEET_X1, sheet_bottom + 5),
+        radius=SHEET_RADIUS,
+        fill=SHADOW,
+    )
+    imagem = Image.alpha_composite(imagem, sombra.filter(ImageFilter.GaussianBlur(9)))
+
+    desenho = ImageDraw.Draw(imagem)
+    desenho.rounded_rectangle(
+        (SHEET_X0, PAGE_PAD, SHEET_X1, sheet_bottom),
+        radius=SHEET_RADIUS,
+        fill=SHEET_BG,
+    )
+
+    render_content(Painter(desenho, False), dados)
+    imagem.convert("RGB").save(caminho_saida, "PNG")
     return WIDTH, altura
 
 
