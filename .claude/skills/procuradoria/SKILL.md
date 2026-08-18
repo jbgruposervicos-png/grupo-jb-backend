@@ -1,6 +1,6 @@
 ---
 name: procuradoria
-description: Processa automaticamente as Situações Fiscais do Departamento de Procuradoria do Grupo JB. Use quando houver Situações Fiscais (PDF, PNG ou outro formato legível) e documentos complementares (prints do e-CAC, prints do Regularize/PGFN, Termo de Exclusão do Simples Nacional) na pasta Departamento Geral/Procuradoria para identificar o contribuinte, avaliar débitos, parcelamentos e a situação na PGFN, gerar o Relatório de Procuradoria em PNG e distribuir os documentos para a pasta correta do contribuinte no Google Drive.
+description: Processa automaticamente as Situações Fiscais do Departamento de Procuradoria do Grupo JB. Use quando houver Situações Fiscais (PDF, PNG ou outro formato legível) e documentos complementares (prints do e-CAC, prints do Regularize/PGFN, Termo de Exclusão do Simples Nacional) na pasta Departamento Geral/Procuradoria para identificar o contribuinte, avaliar débitos, parcelamentos e a situação na PGFN e gerar o Relatório de Procuradoria em PNG, salvando tudo somente na própria pasta Departamento Geral/Procuradoria, sem distribuição automática para as pastas dos contribuintes.
 ---
 
 # PROCESSAMENTO DE PROCURADORIA — GRUPO JB
@@ -345,7 +345,7 @@ Possíveis alertas incluem:
 
 ---
 
-# 15. DATA E COMPETÊNCIA DE ARQUIVAMENTO
+# 15. DATA E REFERÊNCIA DO RELATÓRIO
 
 Utilizar mês e ano da data da Situação Fiscal.
 
@@ -354,8 +354,9 @@ Exemplo:
 ```
 Situação Fiscal emitida em 14/08/2026
 → referência 08/2026
-→ pasta 08 2026
 ```
+
+A referência serve apenas para nomear o relatório. Ela NÃO gera criação de pasta de ano nem de pasta mensal.
 
 Nome do relatório:
 
@@ -404,9 +405,11 @@ O modelo é referência de layout, não fonte de regra nem fonte de valores.
 
 ---
 
-# 17. PASTA DE SAÍDA INICIAL
+# 17. ARMAZENAMENTO — PASTA OPERACIONAL ÚNICA
 
-Após gerar, salvar primeiro em:
+A Procuradoria trabalha com informações VOLÁTEIS: débitos podem ser pagos, parcelados, mudar de valor, deixar de existir, ser inscritos ou retirados da PGFN, ou ter sua situação alterada por uma nova consulta.
+
+Por isso, a única pasta operacional autorizada da Procuradoria é:
 
 ```
 ++++++CONTABILIDADE+++
@@ -414,100 +417,75 @@ Após gerar, salvar primeiro em:
 > Procuradoria
 ```
 
+Regras:
+
+1. A Situação Fiscal original permanece em Departamento Geral > Procuradoria.
+2. Os documentos complementares permanecem nessa mesma pasta.
+3. O Relatório de Procuradoria em PNG deve ser salvo SOMENTE em Departamento Geral > Procuradoria.
+
+A pasta Departamento Geral > Procuradoria é a fonte operacional da situação fiscal atual de cada contribuinte.
+
 Não excluir a Situação Fiscal original.
 
 ---
 
-# 18. DESTINOS POSSÍVEIS
+# 18. PROIBIÇÃO DE DISTRIBUIÇÃO AUTOMÁTICA
 
-O contribuinte pode estar em:
+A automação NÃO deve distribuir automaticamente Situações Fiscais ou Relatórios para as pastas permanentes dos contribuintes.
+
+NÃO utilizar automaticamente as raízes:
 
 ```
 +++++++++++++++EMPRESAS+++++
-```
-
-ou
-
-```
 +++++++++++FAZENDAS+++++
-```
-
-ou
-
-```
 ++++++++EMPREGADA DOMESTICA++++
 ```
 
-Pesquisar o contribuinte nas três raízes quando necessário.
+NÃO copiar ou distribuir automaticamente:
 
-Prioridade:
+- Situação Fiscal;
+- prints;
+- Termos;
+- relatório PNG.
 
-1. CNPJ/CPF;
-2. razão social/nome;
-3. nome da pasta como validação.
+NÃO criar:
 
-Nunca escolher destino incerto.
+- pasta PROCURADORIA dentro do cliente;
+- pasta de ano no cliente;
+- pasta mensal no cliente.
 
----
-
-# 19. ESTRUTURA DE DESTINO
-
-Dentro do contribuinte:
-
-```
-PROCURADORIA
-> ANO
-> MM AAAA
-```
-
-Exemplo:
-
-```
-PROCURADORIA
-> 2026
-> 08 2026
-```
-
-A automação pode criar SOMENTE a pasta:
-
-```
-MM AAAA
-```
-
-Não criar automaticamente:
-
-- cliente;
-- PROCURADORIA;
-- ano.
+Qualquer regra anterior desta Skill que determinava distribuição automática para essas raízes está revogada.
 
 ---
 
-# 20. DISTRIBUIÇÃO
+# 19. VOLATILIDADE DA SITUAÇÃO FISCAL
 
-Quando houver relatório:
+Uma nova Situação Fiscal representa uma nova fotografia do contribuinte.
 
-copiar para o destino:
+Nunca presumir que um relatório antigo continua válido depois de uma nova Situação Fiscal.
 
-- Situação Fiscal original;
-- Relatório de Procuradoria em PNG.
-
-Preservar os originais na pasta Departamento Geral > Procuradoria.
-
-Não mover.
-
-Não excluir.
+O documento vigente é sempre o mais recente disponível na pasta Departamento Geral > Procuradoria.
 
 ---
 
-# 21. DUPLICIDADE
+# 20. DUPLICIDADE E ATUALIZAÇÃO
 
-Antes de gerar ou distribuir, verificar se já existe relatório do mesmo contribuinte e mesmo mês/ano.
+Antes de gerar, verificar se já existe relatório do mesmo contribuinte e mesma referência.
 
 Nunca sobrescrever silenciosamente.
 
-Se já estiver corretamente distribuído:
+Se existir relatório do mesmo contribuinte e mesma referência e surgir uma Situação Fiscal mais recente que altere os dados:
 
-**JÁ DISTRIBUÍDO.**
+- classificar como **ATUALIZAÇÃO NECESSÁRIA**;
+- não reutilizar o relatório anterior como situação atual.
+
+---
+
+# 21. LIMPEZA DA PASTA
+
+Não excluir automaticamente arquivos antigos.
+
+A limpeza da pasta Departamento Geral > Procuradoria continuará sendo uma decisão humana.
 
 ---
 
@@ -537,7 +515,10 @@ Nunca:
 - interpretar aviso genérico como aviso individual;
 - gerar relatório sem condição financeira identificada, apenas por existir alerta;
 - duplicar dívida no total;
-- escolher destino incerto;
+- distribuir automaticamente arquivos para as pastas dos contribuintes;
+- criar pastas dentro das pastas dos contribuintes;
+- excluir automaticamente arquivos antigos;
+- reutilizar relatório anterior como situação atual após nova Situação Fiscal;
 - alterar documentos originais;
 - bloquear todo o lote por um erro isolado.
 
@@ -569,6 +550,8 @@ Executar no formato:
 
 O segundo argumento é o PNG de saída, que depois deve ser renomeado conforme a regra de nome da seção 15.
 
+O script salva o PNG final em paleta indexada adaptativa de até 256 cores, sem dithering e com compressão máxima, para reduzir o tamanho do arquivo sem alterar conteúdo, dimensões ou aparência do relatório.
+
 A estrutura do JSON e os códigos de saída estão documentados em `.claude/skills/procuradoria/scripts/README.md`.
 
 ## Códigos de saída
@@ -587,9 +570,11 @@ A dependência necessária está declarada em `requirements.txt` (`Pillow`).
 
 - Routine;
 - leitura automática da Situação Fiscal (PDF/PNG);
-- distribuição automática no Google Drive.
+- gravação automática no Google Drive.
 
 Esses itens serão criados em etapas posteriores, mediante instrução expressa do usuário.
+
+A distribuição automática para as pastas dos contribuintes NÃO é um item pendente: ela está proibida pela seção 18.
 
 ## Proteção dos recursos da Skill
 

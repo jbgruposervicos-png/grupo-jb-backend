@@ -886,6 +886,26 @@ def tem_condicao_financeira(data):
     return pgfn_com_divida(pgfn)
 
 
+def salvar_png_otimizado(imagem, caminho_saida):
+    """Grava o PNG final em paleta indexada para reduzir o tamanho do arquivo.
+
+    O relatorio tem poucas cores, fundos solidos, texto e formas geometricas,
+    entao a paleta adaptativa de ate 256 cores preserva a aparencia. Sem
+    dithering, para nao criar ruido no texto. Somente a gravacao muda: o
+    desenho continua em RGB/RGBA, com as mesmas dimensoes e o mesmo conteudo.
+    """
+    final = imagem.convert("RGB")
+    dither_none = Image.Dither.NONE if hasattr(Image, "Dither") else Image.NONE
+    try:
+        final = final.convert(
+            "P", palette=Image.ADAPTIVE, colors=256, dither=dither_none
+        )
+    except Exception:
+        # Se a quantizacao falhar, o RGB original ainda gera um PNG valido.
+        pass
+    final.save(caminho_saida, "PNG", optimize=True, compress_level=9)
+
+
 def gerar(dados, caminho_saida):
     measure = ImageDraw.Draw(Image.new("RGB", (1, 1)))
     conteudo = render_content(Painter(measure, True), dados)
@@ -911,7 +931,7 @@ def gerar(dados, caminho_saida):
     )
 
     render_content(Painter(desenho, False), dados)
-    imagem.convert("RGB").save(caminho_saida, "PNG")
+    salvar_png_otimizado(imagem, caminho_saida)
     return WIDTH, altura
 
 
