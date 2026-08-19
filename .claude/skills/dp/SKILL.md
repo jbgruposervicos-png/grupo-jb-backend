@@ -297,7 +297,7 @@ Normalizações obrigatórias para documentos habituais:
 
 O padrão final permanece:
 
-`TIPO CANÔNICO - NOME CANÔNICO DO CLIENTE - MM-AAAA.pdf`
+`TIPO CANÔNICO - NOME OPERACIONAL DO CLIENTE - MM-AAAA.pdf`
 
 ---
 
@@ -357,7 +357,7 @@ A verificação de duplicidade deve usar o **NOME FINAL PADRONIZADO** que a Rout
 Exemplo:
 
 - arquivo de entrada: `Guia INSS - EMPRESA X - 07-2026.pdf`
-- nome final: `INSS - NOME CANÔNICO DO CLIENTE - 07-2026.pdf`
+- nome final: `INSS - NOME OPERACIONAL DO CLIENTE - 07-2026.pdf`
 
 A Routine deve procurar no destino pelo nome final (segundo nome), verificando-o **ANTES** da cópia.
 
