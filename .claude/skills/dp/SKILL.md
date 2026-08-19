@@ -44,16 +44,22 @@ Todos os documentos do lote serão lidos a partir dessa pasta.
 O cliente deve ser localizado em uma destas três estruturas:
 
 1. **EMPRESAS**
-   raiz correspondente a:
-   `+++++++++++++++EMPRESAS+++++`
+   - Nome: `+++++++++++++++EMPRESAS+++++`
+   - ID: `1pX9jZWXniIY2NLKm-LvWBM7MDC8164WA`
 
 2. **FAZENDAS**
-   raiz correspondente a:
-   `+++++++++++FAZENDAS+++++`
+   - Nome: `+++++++++++FAZENDAS+++++`
+   - ID: `12tWjSAV1ucvr1ndUJJYxJNEcNx24dGO7`
 
 3. **EMPREGADA DOMESTICA**
-   raiz correspondente a:
-   `++++++++EMPREGADA DOMESTICA++++`
+   - Nome: `++++++++EMPREGADA DOMESTICA++++`
+   - ID: `1A0gzXFkp8UbxTY0XN5Gg1IiMwWivlp9y`
+
+O **ID estável** é a referência preferencial para localizar a raiz correta no Google Drive.
+
+O nome da pasta serve como conferência.
+
+Não usar caminhos locais `G:\` como endereço operacional dentro da Routine.
 
 Classificação geral:
 
@@ -221,14 +227,46 @@ Não permitido:
 
 ---
 
-## 12. DUPLICIDADE
+## 12. IMPLEMENTAÇÃO DA DISTRIBUIÇÃO
 
-Antes de distribuir, verificar se já existe no destino um arquivo com o mesmo nome final.
+Os documentos de origem já estão no Google Drive, na pasta Departamento Geral > DP.
+
+A distribuição deve preferencialmente ser feita por **operação nativa de cópia** do próprio Google Drive/conector:
+
+- copiar o arquivo original para a pasta de competência correta;
+- o arquivo copiado deve receber o nome final definido pela Skill;
+- preservar o arquivo de origem intacto na pasta DP.
+
+Não permitido na implementação:
+
+- baixar e reenviar o PDF sem necessidade;
+- converter o PDF;
+- reconstruir o PDF;
+- gerar Base64;
+- usar a ponte HTTP da Procuradoria para arquivos do DP;
+- usar scripts para recriar o documento.
+
+A cópia distribuída deve preservar integralmente os bytes/conteúdo do documento original.
+
+### Criação de pasta
+
+- Se a pasta interna Departamento Pessoal ou Folha de Pagamento já estiver identificada com segurança e a competência MM AAAA não existir, criar somente a pasta da competência.
+- Depois realizar a cópia para essa pasta.
+- Não criar automaticamente uma nova pasta principal Departamento Pessoal/Folha de Pagamento.
+
+---
+
+## 13. DUPLICIDADE
+
+Verificar o nome final no destino **ANTES** da cópia.
 
 Nunca sobrescrever silenciosamente.
 
-Se já existir:
+Se já existir um arquivo com o mesmo nome final:
 
+- não copiar por cima;
+- não substituir;
+- não criar "(1)", "cópia" ou variantes automáticas;
 - comparar a identificação disponível;
 - não criar duplicata automaticamente;
 - classificar como JÁ EXISTENTE;
@@ -236,7 +274,7 @@ Se já existir:
 
 ---
 
-## 13. SEGURANÇA
+## 14. SEGURANÇA
 
 Não usar inferências frágeis.
 
@@ -244,15 +282,19 @@ Não distribuir arquivo para um cliente apenas porque o nome é semelhante.
 
 Não criar CPF, CNPJ, competência ou tipo de documento que não estejam sustentados pelo documento.
 
+Nunca mover o arquivo original da pasta Departamento Geral > DP durante o processamento automático.
+
+A Routine faz distribuição por **cópia**.
+
 Não excluir automaticamente arquivos da pasta Departamento Geral > DP após a distribuição.
 
 Não mover ou limpar a fila automaticamente.
 
-A limpeza da pasta de entrada será decisão humana.
+Exclusão/limpeza da fila será sempre decisão humana posterior.
 
 ---
 
-## 14. PROCESSAMENTO EM LOTE
+## 15. PROCESSAMENTO EM LOTE
 
 A Routine poderá processar vários documentos e vários clientes no mesmo lote.
 
@@ -262,7 +304,7 @@ Uma falha em um arquivo não deve impedir o processamento seguro dos demais.
 
 ---
 
-## 15. RESULTADO DO LOTE
+## 16. RESULTADO DO LOTE
 
 Ao final, informar para cada arquivo:
 
@@ -290,7 +332,7 @@ Ao final apresentar totais:
 
 ---
 
-## 16. PRINCÍPIO CENTRAL
+## 17. PRINCÍPIO CENTRAL
 
 Esta Skill é uma rotina de ORGANIZAÇÃO DOCUMENTAL do Departamento Pessoal.
 
