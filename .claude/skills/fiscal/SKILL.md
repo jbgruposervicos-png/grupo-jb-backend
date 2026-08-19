@@ -1087,7 +1087,7 @@ Quando houver PGDAS:
 - associar o DAS correspondente quando houver;
 - associar outros documentos fiscais da mesma empresa e da mesma competência quando forem pertinentes;
 - consultar a planilha permanente e a competência correta conforme as regras existentes (seções 5, 6 e 7);
-- aplicar as regras de receitas (seção 7B), Fator R quando aplicável, classificação SERVIÇO/COMÉRCIO (seção 7A) e demais regras já existentes;
+- aplicar as regras de receitas (seção 7B), classificação SERVIÇO/COMÉRCIO (seção 7A) e demais regras já existentes;
 - gerar o Relatório Fiscal pelo gerador oficial (R2 e R7);
 - distribuir os documentos correspondentes e o relatório conforme a metodologia atual (seções 13 a 19).
 
@@ -1180,4 +1180,4 @@ PGDAS = gatilho para a análise e para o Relatório Fiscal.
 
 DAS, DAE e outros documentos fiscais = documentos que podem ser distribuídos normalmente, mas não geram relatório por si só.
 
-Nenhuma regra já existente sobre cálculo, Fator R, receitas, planilha permanente, geração do relatório ou destino dos arquivos é alterada por estas seções.
+Nenhuma regra já existente sobre cálculo, receitas, planilha permanente, geração do relatório ou destino dos arquivos é alterada por estas seções.
