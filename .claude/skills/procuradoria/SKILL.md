@@ -566,11 +566,111 @@ O código `2` não é falha. É a aplicação da regra de que contribuinte sem d
 
 A dependência necessária está declarada em `requirements.txt` (`Pillow`).
 
+## PONTE OFICIAL DE UPLOAD (HTTP)
+
+O envio do Relatório de Procuradoria em PNG para o Google Drive deve ser feito EXCLUSIVAMENTE pela ponte HTTP oficial, configurada nas variáveis de ambiente:
+
+- `JB_PROC_UPLOAD_URL` — endereço do Web App que recebe o arquivo;
+- `JB_PROC_UPLOAD_TOKEN` — token de autenticação da ponte.
+
+### Requisição
+
+Método: **HTTP POST**
+
+Cabeçalho:
+
+```
+Content-Type: application/json
+```
+
+Corpo JSON, exatamente com estes três campos:
+
+```json
+{
+  "token": "<valor de JB_PROC_UPLOAD_TOKEN>",
+  "filename": "<nome final do PNG>",
+  "base64": "<conteúdo integral do PNG codificado em Base64>"
+}
+```
+
+O `filename` é o nome final do relatório, conforme a regra da seção 15.
+
+O Base64 deve ser produzido e enviado programaticamente, a partir do arquivo PNG local. Nunca imprimir o conteúdo Base64 completo na resposta da Routine.
+
+### Token
+
+O token é segredo operacional.
+
+Nunca exibir, copiar ou reproduzir o valor de `JB_PROC_UPLOAD_TOKEN` em logs, mensagens, respostas, relatórios, commits ou qualquer saída visível.
+
+Referenciar sempre a variável de ambiente, nunca o valor.
+
+### Contrato definitivo
+
+O contrato acima é definitivo.
+
+Não sondar o endpoint, não testar nomes alternativos de campos e não tentar descobrir o formato da requisição por tentativa e erro.
+
+Se a ponte recusar a requisição, interromper aquele contribuinte e informar o problema.
+
+### Validação antes do upload
+
+Antes de enviar, validar o PNG local:
+
+- assinatura PNG válida;
+- dimensões;
+- tamanho em bytes;
+- conteúdo financeiro coerente com a Situação Fiscal.
+
+### Retorno do Web App
+
+O Web App responde em JSON, no formato:
+
+```json
+{
+  "ok": true,
+  "fileId": "...",
+  "filename": "...",
+  "size": 17828
+}
+```
+
+O upload só pode ser considerado bem-sucedido quando TODAS estas condições forem verdadeiras:
+
+1. `ok` = `true`;
+2. `filename` retornado corresponde ao arquivo enviado;
+3. `size` retornado é exatamente igual ao tamanho local do PNG em bytes.
+
+Se os tamanhos forem diferentes, o upload é **FALHA**: não tratar o relatório como entregue e informar a divergência.
+
+Se o Web App retornar `arquivo_ja_existe`, não sobrescrever silenciosamente — aplicar a regra de duplicidade da seção 20.
+
+### Destino
+
+O destino continua sendo exclusivamente:
+
+```
+++++++CONTABILIDADE+++
+> Departamento Geral
+> Procuradoria
+```
+
+Nunca enviar automaticamente para EMPRESAS, FAZENDAS, EMPREGADA DOMÉSTICA ou qualquer outra pasta, conforme a seção 18.
+
+### Conector do Google Drive
+
+Enquanto esta ponte estiver configurada, o conector do Google Drive pode ser usado para **leitura e conferência** (localizar a Situação Fiscal, ler documentos complementares, verificar duplicidade, conferir o arquivo enviado).
+
+O conector do Google Drive **NÃO** deve ser usado para enviar o PNG final.
+
+### Documentos de origem
+
+Após o upload, não excluir, mover nem renomear a Situação Fiscal, os documentos complementares ou qualquer outro documento de origem.
+
 ## Ainda não implementado
 
 - Routine;
-- leitura automática da Situação Fiscal (PDF/PNG);
-- gravação automática no Google Drive.
+- leitura automática da Situação Fiscal (PDF/PNG).
 
 Esses itens serão criados em etapas posteriores, mediante instrução expressa do usuário.
 
