@@ -1,6 +1,6 @@
 ---
 name: fiscal
-description: Processa automaticamente documentos do Departamento Fiscal do Grupo JB. Use quando houver DAS e PGDAS na pasta Departamento Geral/Fiscal para identificar a empresa e competência, consultar a planilha fiscal, gerar o Relatório Fiscal e distribuir os documentos para a pasta correta da empresa no Google Drive.
+description: Processa automaticamente documentos do Departamento Fiscal do Grupo JB. Use quando houver DAS e PGDAS na pasta Departamento Geral/Fiscal para identificar a empresa e competência, consultar a planilha fiscal, gerar o Relatório Fiscal e distribuir os documentos para a pasta correta da empresa no Google Drive. Use também quando houver outros documentos fiscais na mesma pasta (DAE, guias estaduais, guias municipais, documentos de ICMS ou ISS e demais documentos destinados ao cliente) que devam apenas ser identificados, renomeados e distribuídos para a competência correta, sem geração de Relatório Fiscal.
 ---
 
 # PROCESSAMENTO FISCAL — GRUPO JB
@@ -1003,3 +1003,181 @@ Nunca:
 - continuar quando CNPJ ou competência forem incompatíveis.
 
 Quando houver dúvida material, interrompa e informe exatamente qual validação falhou.
+
+---
+
+# 21. DOCUMENTOS FISCAIS DE DISTRIBUIÇÃO
+
+A pasta:
+
+Departamento Geral > Fiscal
+
+poderá receber vários tipos de documentos, e não apenas DAS e PGDAS.
+
+Exemplos:
+
+- PGDAS;
+- DAS;
+- DAE;
+- guias estaduais;
+- guias municipais;
+- documentos de ICMS;
+- documentos de ISS;
+- outros documentos fiscais destinados ao cliente.
+
+A lista NÃO é fechada.
+
+Novos tipos de documento fiscal podem aparecer e devem ser tratados normalmente.
+
+## 21.1. Identificação do tipo
+
+A Routine deve identificar o tipo do documento pelo CONTEÚDO do documento.
+
+O nome original do arquivo é apenas apoio, nunca a fonte principal da classificação.
+
+Não inventar tipo de documento.
+
+Se o tipo não puder ser determinado com segurança pelo conteúdo, não classificar por suposição: registrar o documento como não identificado e seguir para os demais.
+
+---
+
+# 22. DUAS MODALIDADES DE PROCESSAMENTO
+
+Existem dois comportamentos distintos na pasta Fiscal.
+
+## 22.1. Modalidade 1 — DOCUMENTO SOMENTE PARA DISTRIBUIÇÃO
+
+Quando um documento fiscal NÃO for PGDAS e não exigir processamento analítico pela metodologia existente, ele segue apenas o fluxo de distribuição:
+
+1. identificar com segurança o contribuinte;
+2. identificar o CNPJ;
+3. identificar a competência;
+4. identificar o tipo do documento;
+5. localizar a pasta de destino da empresa;
+6. renomear conforme o padrão fiscal adotado;
+7. distribuir o documento para a competência correta.
+
+Exemplos:
+
+- DAE;
+- guia estadual;
+- guia municipal;
+- outros documentos fiscais.
+
+Esses documentos, isoladamente, NÃO geram Relatório Fiscal.
+
+NÃO exigir a existência de PGDAS para distribuir esses documentos.
+
+Se o documento estiver corretamente identificado, pode ser distribuído independentemente.
+
+Nessa modalidade:
+
+- não consultar a planilha permanente para efeito de relatório;
+- não executar o gerador oficial;
+- não produzir Relatório Fiscal.
+
+## 22.2. Modalidade 2 — PROCESSAMENTO COM RELATÓRIO FISCAL
+
+O PGDAS é o documento que aciona o processamento analítico e a geração do Relatório Fiscal.
+
+Quando houver PGDAS:
+
+- aplicar integralmente a metodologia Fiscal já existente neste SKILL.md;
+- identificar contribuinte e competência;
+- associar o DAS correspondente quando houver;
+- associar outros documentos fiscais da mesma empresa e da mesma competência quando forem pertinentes;
+- consultar a planilha permanente e a competência correta conforme as regras existentes (seções 5, 6 e 7);
+- aplicar as regras de receitas (seção 7B), classificação SERVIÇO/COMÉRCIO (seção 7A) e demais regras já existentes;
+- gerar o Relatório Fiscal pelo gerador oficial (R2 e R7);
+- distribuir os documentos correspondentes e o relatório conforme a metodologia atual (seções 13 a 19).
+
+A presença de DAE, guia estadual, guia municipal ou qualquer outro documento NÃO substitui o PGDAS como gatilho do Relatório Fiscal.
+
+As regras das seções 3, 19 e L6 (documentos obrigatórios, validação final e elegibilidade do grupo) aplicam-se à Modalidade 2 — o fluxo que gera Relatório Fiscal — e não bloqueiam a distribuição prevista na Modalidade 1.
+
+---
+
+# 23. ASSOCIAÇÃO DOS DOCUMENTOS
+
+Sempre associar documentos por:
+
+1. CNPJ;
+2. competência;
+3. identificação do contribuinte.
+
+NUNCA associar documentos apenas pela proximidade na pasta ou pela semelhança do nome do arquivo.
+
+Documentos de empresas diferentes ou de competências diferentes NUNCA devem ser agrupados no mesmo processamento.
+
+Essa regra complementa e reforça o agrupamento CNPJ + COMPETÊNCIA já definido em L5.
+
+---
+
+# 24. EXEMPLOS DE COMPORTAMENTO
+
+## Exemplo A
+
+Empresa X
+DAE 07/2026
+
+Resultado:
+
+- distribuir o DAE;
+- não gerar Relatório Fiscal.
+
+## Exemplo B
+
+Empresa X
+DAS 07/2026
+DAE 07/2026
+
+Resultado:
+
+- distribuir os documentos identificados;
+- não gerar Relatório Fiscal apenas por causa desses documentos.
+
+## Exemplo C
+
+Empresa X
+PGDAS 07/2026
+DAS 07/2026
+DAE 07/2026
+
+Resultado:
+
+- executar toda a metodologia Fiscal;
+- gerar o Relatório Fiscal de 07/2026;
+- distribuir PGDAS, DAS, DAE e o relatório para a competência correta, conforme aplicável.
+
+## Exemplo D
+
+Empresa X possui PGDAS 07/2026.
+Empresa Y possui apenas DAE 07/2026.
+
+Resultado:
+
+- Empresa X: gerar Relatório Fiscal e distribuir documentos;
+- Empresa Y: apenas distribuir o DAE;
+- nunca misturar os documentos das duas empresas.
+
+---
+
+# 25. SEGURANÇA NA DISTRIBUIÇÃO
+
+- Um documento de distribuição NÃO deve disparar relatório sem PGDAS.
+- Não inventar competência.
+- Não inventar tipo de documento.
+- Não distribuir quando não houver identificação segura do cliente.
+- Não sobrescrever documentos existentes silenciosamente.
+- Uma falha em um documento não deve impedir o processamento seguro dos demais.
+- Manter todas as regras atuais de duplicidade, armazenamento e distribuição desta Skill (seções 13 a 20 e L7, L9, L13).
+
+---
+
+# 26. PRINCÍPIO
+
+PGDAS = gatilho para a análise e para o Relatório Fiscal.
+
+DAS, DAE e outros documentos fiscais = documentos que podem ser distribuídos normalmente, mas não geram relatório por si só.
+
+Nenhuma regra já existente sobre cálculo, receitas, planilha permanente, geração do relatório ou destino dos arquivos é alterada por estas seções.
