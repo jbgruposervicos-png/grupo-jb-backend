@@ -82,7 +82,7 @@ Usar como chave principal, sempre que disponível:
 
 O nome é elemento de confirmação.
 
-Após localizar com segurança o cliente no Drive, usar no nome final do arquivo o nome canônico da pasta do cliente.
+Após localizar com segurança o cliente no Drive, determinar o nome do cliente a ser usado no nome final do arquivo conforme a seção 9.1 (NOME OPERACIONAL DO CLIENTE NO ARQUIVO).
 
 Não distribuir quando:
 
@@ -245,6 +245,33 @@ Para cliente pessoa física:
 
 A pasta usa "08 2026", mas o arquivo usa "08-2026".
 
+### 9.1 NOME OPERACIONAL DO CLIENTE NO ARQUIVO
+
+O nome usado no arquivo final não deve ser automaticamente o nome completo da pasta do cliente quando essa pasta possuir razão social, nome fantasia, nome pessoal ou outras identificações concatenadas.
+
+Depois de confirmar o cliente por CPF/CNPJ, determinar o nome operacional assim:
+
+1. Verificar os documentos já existentes nas pastas de Departamento Pessoal/Folha de Pagamento daquele mesmo cliente.
+2. Se houver um nome curto utilizado de forma consistente nos arquivos existentes e a identidade estiver confirmada pelo mesmo CPF/CNPJ, usar esse nome como nome operacional.
+3. Exemplo:
+
+   pasta:
+
+   `BEATRIZ DE BRITO CANTOR SERVICOS DE ENGENHARIA & PROJETOS - BEATRIZ DE BRITO CANTOR ENGENHARIA - BEATRIZ DE BRITO CANTOR`
+
+   nome operacional já utilizado:
+
+   `BEATRIZ DE BRITO CANTOR ENGENHARIA`
+
+   portanto:
+
+   `INSS - BEATRIZ DE BRITO CANTOR ENGENHARIA - 07-2026.pdf`
+
+4. Se não houver histórico suficiente ou houver variação/confusão nos nomes existentes, usar a razão social ou nome do empregador identificado diretamente no documento.
+5. Nunca escolher um segmento do nome da pasta por mera suposição.
+6. CPF/CNPJ continua sendo a chave para confirmar que os arquivos históricos pertencem ao mesmo cliente.
+7. Depois de definido para aquele processamento, usar exatamente o mesmo nome operacional em todos os documentos do mesmo cliente e competência.
+
 ---
 
 ## 10. IDENTIFICAÇÃO DO TIPO
@@ -270,7 +297,7 @@ Normalizações obrigatórias para documentos habituais:
 
 O padrão final permanece:
 
-`TIPO CANÔNICO - NOME CANÔNICO DO CLIENTE - MM-AAAA.pdf`
+`TIPO CANÔNICO - NOME OPERACIONAL DO CLIENTE - MM-AAAA.pdf`
 
 ---
 
@@ -330,7 +357,7 @@ A verificação de duplicidade deve usar o **NOME FINAL PADRONIZADO** que a Rout
 Exemplo:
 
 - arquivo de entrada: `Guia INSS - EMPRESA X - 07-2026.pdf`
-- nome final: `INSS - NOME CANÔNICO DO CLIENTE - 07-2026.pdf`
+- nome final: `INSS - NOME OPERACIONAL DO CLIENTE - 07-2026.pdf`
 
 A Routine deve procurar no destino pelo nome final (segundo nome), verificando-o **ANTES** da cópia.
 
