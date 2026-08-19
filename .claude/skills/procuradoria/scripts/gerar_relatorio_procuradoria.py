@@ -26,12 +26,13 @@ Codigos de saida:
        (secao 4 do SKILL.md: alerta sozinho nao gera relatorio)
 """
 
+import io
 import json
 import os
 import sys
 
 try:
-    from PIL import Image, ImageDraw, ImageFilter, ImageFont
+    from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 except ImportError:  # pragma: no cover - depende do ambiente
     sys.stderr.write(
         "ERRO: a biblioteca Pillow e necessaria para gerar o PNG.\n"
@@ -886,24 +887,83 @@ def tem_condicao_financeira(data):
     return pgfn_com_divida(pgfn)
 
 
+# O upload nativo do Google Drive embute o arquivo na requisicao, e na
+# pratica PNGs acima de ~17 KB falharam ou truncaram. O alvo operacional de
+# seguranca e 15.000 bytes — alvo, nao motivo para degradar o relatorio.
+TAMANHO_ALVO = 15000
+
+# Niveis de paleta tentados em ordem. Os niveis abaixo de 64 cores so sao
+# aceitos quando o desvio medio em relacao ao desenho original permanece
+# baixo, para nunca entregar texto ou cores visivelmente degradados.
+NIVEIS_PALETA = (256, 128, 64, 48, 32)
+DESVIO_MEDIO_MAXIMO = {256: None, 128: 2.5, 64: 2.5, 48: 1.5, 32: 1.5}
+
+
+def _desvio_medio(original_rgb, candidata):
+    """Desvio medio por canal (0-255) entre o desenho original e a paleta."""
+    diff = ImageChops.difference(original_rgb, candidata.convert("RGB"))
+    hist = diff.histogram()
+    soma = sum(
+        valor * indice
+        for canal in range(3)
+        for indice, valor in enumerate(hist[canal * 256 : (canal + 1) * 256])
+    )
+    return soma / (3.0 * diff.width * diff.height)
+
+
+def _png_em_paleta(final, cores, dither_none):
+    """Quantiza e codifica em memoria; devolve (bytes, desvio medio)."""
+    candidata = final.convert(
+        "P", palette=Image.ADAPTIVE, colors=cores, dither=dither_none
+    )
+    buffer = io.BytesIO()
+    # Sem pnginfo/exif: nenhum metadado desnecessario e gravado no PNG.
+    candidata.save(buffer, "PNG", optimize=True, compress_level=9)
+    return buffer.getvalue(), _desvio_medio(final, candidata)
+
+
 def salvar_png_otimizado(imagem, caminho_saida):
-    """Grava o PNG final em paleta indexada para reduzir o tamanho do arquivo.
+    """Grava o PNG final em paleta indexada, reduzindo cores progressivamente.
 
     O relatorio tem poucas cores, fundos solidos, texto e formas geometricas,
-    entao a paleta adaptativa de ate 256 cores preserva a aparencia. Sem
-    dithering, para nao criar ruido no texto. Somente a gravacao muda: o
-    desenho continua em RGB/RGBA, com as mesmas dimensoes e o mesmo conteudo.
+    entao a paleta adaptativa preserva a aparencia. Sem dithering, para nao
+    criar ruido no texto. Somente a gravacao muda: o desenho continua em
+    RGB/RGBA, com as mesmas dimensoes, fontes e conteudo.
+
+    Comeca em 256 cores e so desce (128, 64, 48, 32) enquanto o arquivo
+    estiver acima de TAMANHO_ALVO e o desvio visual medio permanecer dentro
+    do limite do nivel. Se nenhum nivel aceitavel atingir o alvo, prevalece a
+    melhor qualidade e o chamador e avisado de que o arquivo ficou acima do
+    alvo. Devolve (bytes gravados, cores da paleta ou None para RGB).
     """
     final = imagem.convert("RGB")
     dither_none = Image.Dither.NONE if hasattr(Image, "Dither") else Image.NONE
+
+    escolhido = None
+    cores_escolhidas = None
     try:
-        final = final.convert(
-            "P", palette=Image.ADAPTIVE, colors=256, dither=dither_none
-        )
+        for cores in NIVEIS_PALETA:
+            dados, desvio = _png_em_paleta(final, cores, dither_none)
+            limite = DESVIO_MEDIO_MAXIMO[cores]
+            if limite is not None and desvio > limite:
+                # Nivel visivelmente degradado: fica o nivel anterior, mesmo
+                # que o arquivo continue acima do alvo.
+                break
+            escolhido, cores_escolhidas = dados, cores
+            if len(dados) <= TAMANHO_ALVO:
+                break
     except Exception:
+        escolhido = None
+
+    if escolhido is None:
         # Se a quantizacao falhar, o RGB original ainda gera um PNG valido.
-        pass
-    final.save(caminho_saida, "PNG", optimize=True, compress_level=9)
+        buffer = io.BytesIO()
+        final.save(buffer, "PNG", optimize=True, compress_level=9)
+        escolhido, cores_escolhidas = buffer.getvalue(), None
+
+    with open(caminho_saida, "wb") as arquivo:
+        arquivo.write(escolhido)
+    return len(escolhido), cores_escolhidas
 
 
 def gerar(dados, caminho_saida):
@@ -921,7 +981,14 @@ def gerar(dados, caminho_saida):
         radius=SHEET_RADIUS,
         fill=SHADOW,
     )
-    imagem = Image.alpha_composite(imagem, sombra.filter(ImageFilter.GaussianBlur(9)))
+    sombra = sombra.filter(ImageFilter.GaussianBlur(9))
+    # A sombra externa da folha e posterizada em poucas gradacoes: a olho nu
+    # continua a mesma sombra suave, mas o degrade deixa de consumir centenas
+    # de cores da paleta e o PNG comprime muito melhor. Geometria, posicao,
+    # bordas e conteudo dos cards nao mudam.
+    alfa = sombra.getchannel("A").point(lambda a: a - a % 7)
+    sombra.putalpha(alfa)
+    imagem = Image.alpha_composite(imagem, sombra)
 
     desenho = ImageDraw.Draw(imagem)
     desenho.rounded_rectangle(
@@ -931,8 +998,8 @@ def gerar(dados, caminho_saida):
     )
 
     render_content(Painter(desenho, False), dados)
-    salvar_png_otimizado(imagem, caminho_saida)
-    return WIDTH, altura
+    tamanho, cores = salvar_png_otimizado(imagem, caminho_saida)
+    return WIDTH, altura, tamanho, cores
 
 
 def main(argv):
@@ -968,12 +1035,23 @@ def main(argv):
         return 2
 
     try:
-        largura, altura = gerar(dados, caminho_png)
+        largura, altura, tamanho, cores = gerar(dados, caminho_png)
     except OSError as erro:
         sys.stderr.write("ERRO ao gravar o PNG: {}\n".format(erro))
         return 1
 
-    print("Relatorio gerado: {} ({}x{} px)".format(caminho_png, largura, altura))
+    paleta = "{} cores".format(cores) if cores else "RGB sem paleta"
+    print(
+        "Relatorio gerado: {} ({}x{} px, {}, {} bytes)".format(
+            caminho_png, largura, altura, paleta, tamanho
+        )
+    )
+    if tamanho > TAMANHO_ALVO:
+        sys.stderr.write(
+            "AVISO: PNG final com {} bytes, acima do alvo de {} bytes do upload "
+            "nativo. Reduzir mais a paleta degradaria o relatorio; este arquivo "
+            "exige outra solucao de upload.\n".format(tamanho, TAMANHO_ALVO)
+        )
     return 0
 
 
