@@ -110,7 +110,7 @@ Dentro dela ficam as pastas de competência.
 
 ## 6. COMPETÊNCIA
 
-O padrão obrigatório das pastas é:
+O padrão obrigatório das pastas de competência é:
 
 `MM AAAA`
 
@@ -120,13 +120,63 @@ Exemplos:
 - 09 2026
 - 12 2026
 
-Quando a pasta da competência correta não existir, a Routine está autorizada a criá-la.
-
 Não criar competência com hífen.
 
 Não incluir nome do mês.
 
 Se não for possível identificar a competência com segurança pelo conteúdo do documento, não inventar. Manter para revisão manual.
+
+### 6.1 ESTRUTURA DE PASTAS POR ANO
+
+A estrutura interna do cliente pode existir de duas formas válidas:
+
+**FORMA A** (competência direta):
+
+```
+Departamento Pessoal / Folha de Pagamento
+> MM AAAA
+```
+
+Exemplo:
+
+```
+DEPARTAMENTO PESSOAL
+> 08 2026
+```
+
+**FORMA B** (competência dentro de pasta de ano):
+
+```
+Departamento Pessoal / Folha de Pagamento
+> AAAA
+> MM AAAA
+```
+
+Exemplo:
+
+```
+DEPARTAMENTO PESSOAL
+> 2026
+> 08 2026
+```
+
+A Routine deve respeitar a estrutura já utilizada pelo cliente.
+
+Regra:
+
+- se existir uma pasta de ano AAAA correspondente à competência, usar essa pasta e localizar/criar MM AAAA dentro dela;
+- se não existir pasta de ano e as competências estiverem diretamente dentro de Departamento Pessoal/Folha de Pagamento, manter essa estrutura;
+- não reorganizar pastas existentes;
+- não mover competências antigas;
+- não criar uma estrutura paralela diferente da já utilizada pelo cliente.
+
+Se ainda não houver nenhuma competência que permita determinar o padrão:
+
+- verificar se existe pasta de ano AAAA;
+- se existir, criar MM AAAA dentro dela;
+- se não existir, criar MM AAAA diretamente dentro de Departamento Pessoal/Folha de Pagamento.
+
+Quando a pasta da competência correta (MM AAAA) não existir, a Routine está autorizada a criá-la, respeitando a estrutura acima.
 
 ---
 
@@ -205,6 +255,23 @@ Usar títulos, cabeçalhos, órgãos emissores, natureza do documento e demais e
 
 O nome original pode ser usado apenas como indício complementar.
 
+### 10.1 NORMALIZAÇÃO DO TIPO NO NOME FINAL
+
+O nome original do arquivo NÃO determina o texto do nome final.
+
+Após identificar o tipo pelo conteúdo, usar a nomenclatura canônica da Skill.
+
+Normalizações obrigatórias para documentos habituais:
+
+- "Guia INSS", "DARF Previdenciário", "DCTFWeb - DARF" ou equivalentes identificados como recolhimento previdenciário → **INSS**
+- "Extrato Mensal", "Extrato da Folha" ou equivalente identificado como extrato → **EXTRATO**
+- "Recibo", "Recibo Mensal", "Recibo de Salário" quando for efetivamente recibo mensal → **RECIBO DE PAGAMENTO**
+- Documentos de FGTS identificados como guia/recolhimento mensal → **FGTS**
+
+O padrão final permanece:
+
+`TIPO CANÔNICO - NOME CANÔNICO DO CLIENTE - MM-AAAA.pdf`
+
 ---
 
 ## 11. DOCUMENTO ORIGINAL
@@ -258,11 +325,18 @@ A cópia distribuída deve preservar integralmente os bytes/conteúdo do documen
 
 ## 13. DUPLICIDADE
 
-Verificar o nome final no destino **ANTES** da cópia.
+A verificação de duplicidade deve usar o **NOME FINAL PADRONIZADO** que a Routine pretende criar (após a normalização da seção 10.1), e não simplesmente o nome original recebido.
+
+Exemplo:
+
+- arquivo de entrada: `Guia INSS - EMPRESA X - 07-2026.pdf`
+- nome final: `INSS - NOME CANÔNICO DO CLIENTE - 07-2026.pdf`
+
+A Routine deve procurar no destino pelo nome final (segundo nome), verificando-o **ANTES** da cópia.
 
 Nunca sobrescrever silenciosamente.
 
-Se já existir um arquivo com o mesmo nome final:
+Se existir exatamente o nome final:
 
 - não copiar por cima;
 - não substituir;
@@ -271,6 +345,10 @@ Se já existir um arquivo com o mesmo nome final:
 - não criar duplicata automaticamente;
 - classificar como JÁ EXISTENTE;
 - manter o arquivo de entrada intacto até decisão humana.
+
+Se não existir o nome final, o documento pode estar PRONTO PARA DISTRIBUIÇÃO, desde que todas as demais validações estejam satisfeitas.
+
+Não classificar automaticamente como REVISÃO MANUAL apenas porque existe um arquivo antigo com nomenclatura diferente.
 
 ---
 
