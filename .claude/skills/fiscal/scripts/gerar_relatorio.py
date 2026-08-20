@@ -1,6 +1,7 @@
 import json
 import sys
 import unicodedata
+from datetime import date
 from pathlib import Path
 
 from reportlab.lib import colors
@@ -452,13 +453,17 @@ def card_comparacao(c, x, y, w, h, titulo, competencia, anterior, atual):
 # ============================================================
 
 
-def desenhar_grafico_vendas(c, x, y, w, h, historico):
-    """Desenha o bloco do gráfico dentro do retângulo (x, y, w, h)."""
+def desenhar_grafico_vendas(c, x, y, w, h, historico, titulo="VENDAS MENSAIS"):
+    """Desenha o bloco do gráfico dentro do retângulo (x, y, w, h).
+
+    `titulo` mantém o padrão histórico do comércio ("VENDAS MENSAIS");
+    o layout de serviço passa "RECEITAS MENSAIS".
+    """
     arredondar_caixa(c, x, y, w, h, BRANCO, CINZA_CLARO)
 
     centralizar(
         c,
-        "VENDAS MENSAIS",
+        titulo,
         x,
         y + h - 17,
         w,
@@ -754,11 +759,554 @@ def bloco_das(c, x, y, w, h, dados, impostos):
 
 
 # ============================================================
+# LAYOUT DE SERVIÇO
+# ------------------------------------------------------------
+# Caminho de renderização próprio das empresas de SERVIÇO, seguindo o
+# modelo visual oficial:
+#   .claude/skills/fiscal/references/modelo_relatorio_fiscal_servico.pdf
+#
+# Nada aqui é usado pelo layout de COMÉRCIO, que permanece inalterado.
+# ============================================================
+
+DOURADO = colors.HexColor("#C8A165")
+FUNDO_NEUTRO = colors.HexColor("#F4F6F9")
+BORDA_NEUTRA = colors.HexColor("#E3E8EF")
+VERMELHO_SUAVE = colors.HexColor("#FDF1EF")
+BORDA_VERMELHA = colors.HexColor("#F2D8D4")
+AZUL_FATOR = colors.HexColor("#E9F1FB")
+BORDA_FATOR = colors.HexColor("#C9DCF2")
+VERDE_SUAVE = colors.HexColor("#EAF6EC")
+BORDA_VERDE = colors.HexColor("#CDE8D2")
+FONTE_ITALICO = "Helvetica-Oblique"
+
+MARGEM_SERV = 34
+
+# Limite legal do Fator R (Simples Nacional): >= 28% → Anexo III;
+# abaixo de 28% → Anexo V.
+LIMIAR_FATOR_R = 28.0
+
+
+def _normalizar_anexo(texto):
+    return str(texto or "").upper().replace("ANEXO", "").strip()
+
+
+def validar_fator_r(dados):
+    """Valida o bloco `fator_r` do JSON e devolve os dados prontos para
+    desenhar — ou None quando o bloco não deve ser desenhado.
+
+    Regras (seção 7C do SKILL.md):
+    - objeto ausente ou `aplicavel` != true → sem bloco (a aplicabilidade é
+      decidida na etapa analítica, nunca deduzida aqui);
+    - `aplicavel` true exige folha_12m e faturamento_12m válidos;
+    - a decisão Anexo III/V usa o valor CALCULADO (folha/faturamento), sem
+      arredondamento de exibição;
+    - percentual/anexo informados que contradigam o cálculo geram erro de
+      validação — o gerador nunca imprime um enquadramento contraditório.
+    """
+    bruto = dados.get("fator_r")
+    if not isinstance(bruto, dict) or not bruto.get("aplicavel"):
+        return None
+
+    def _numero(campo):
+        valor = bruto.get(campo)
+        if valor in (None, ""):
+            raise ValueError(
+                f"fator_r.aplicavel=true exige o campo fator_r.{campo}; "
+                "sem esse dado o relatório de serviço não pode afirmar o "
+                "enquadramento — sinalizar revisão manual."
+            )
+        try:
+            return float(valor)
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"fator_r.{campo} inválido (não numérico): {valor!r}"
+            )
+
+    folha = _numero("folha_12m")
+    faturamento = _numero("faturamento_12m")
+
+    if faturamento <= 0:
+        raise ValueError(
+            "fator_r.faturamento_12m (RBT12) zerado ou inválido: não é "
+            "possível calcular o Fator R — sinalizar revisão manual."
+        )
+
+    # A metodologia oficial (seção 7C do SKILL.md) define que
+    # faturamento_12m É o RBT12 extraído do PGDAS. Por isso, com
+    # fator_r.aplicavel=true o campo rbt12 é OBRIGATÓRIO: sem o RBT12
+    # oficial o denominador do Fator R não tem origem comprovada, e o
+    # relatório não pode ser gerado apenas com fator_r.faturamento_12m.
+    rbt12 = dados.get("rbt12")
+    if rbt12 in (None, ""):
+        raise ValueError(
+            "fator_r.aplicavel=true exige o campo rbt12 (RBT12 oficial "
+            "do PGDAS); sem ele o denominador do Fator R não tem origem "
+            "comprovada — sinalizar revisão manual."
+        )
+
+    try:
+        rbt12 = float(rbt12)
+    except (TypeError, ValueError):
+        raise ValueError(f"rbt12 inválido (não numérico): {rbt12!r}")
+
+    if rbt12 <= 0:
+        raise ValueError(
+            "rbt12 (RBT12 oficial do PGDAS) zerado ou inválido: não é "
+            "possível calcular o Fator R — sinalizar revisão manual."
+        )
+
+    # Os dois campos devem coincidir, com tolerância apenas para
+    # arredondamento monetário (R$ 0,01) — a diferença é arredondada a
+    # centavos antes da comparação, para que exatamente R$ 0,01 não seja
+    # rejeitado por ruído de ponto flutuante. Divergência maior é erro —
+    # nunca escolher silenciosamente um dos dois valores.
+    if round(abs(faturamento - rbt12), 2) > 0.01:
+        raise ValueError(
+            "Fator R inconsistente: faturamento_12m deve corresponder "
+            "ao RBT12 oficial do PGDAS "
+            f"(faturamento_12m={faturamento:.2f}, rbt12={rbt12:.2f})."
+        )
+
+    exato = (folha / faturamento) * 100
+
+    informado = bruto.get("percentual")
+    if informado not in (None, ""):
+        if abs(float(informado) - exato) > 0.5:
+            raise ValueError(
+                f"fator_r.percentual informado ({informado}) não confere "
+                f"com folha_12m / faturamento_12m ({exato:.2f}%)."
+            )
+
+    anexo_calculado = (
+        "Anexo III" if exato >= LIMIAR_FATOR_R else "Anexo V"
+    )
+
+    anexo_informado = bruto.get("anexo_aplicado")
+    if anexo_informado not in (None, ""):
+        if _normalizar_anexo(anexo_informado) != _normalizar_anexo(
+            anexo_calculado
+        ):
+            raise ValueError(
+                f"fator_r.anexo_aplicado ({anexo_informado}) contradiz o "
+                f"Fator R calculado de {exato:.2f}% "
+                f"(limite {LIMIAR_FATOR_R:.0f}% → {anexo_calculado})."
+            )
+
+    # O anexo do card FAIXA (campo "anexo") deve ser coerente com o
+    # enquadramento do Fator R: o PDF nunca pode mostrar um Anexo no card
+    # e explicar outro no bloco Fator R.
+    anexo_card = dados.get("anexo")
+    if anexo_card not in (None, ""):
+        if _normalizar_anexo(anexo_card) != _normalizar_anexo(
+            anexo_calculado
+        ):
+            raise ValueError(
+                f"Fator R inconsistente: o campo anexo ({anexo_card}) "
+                "diverge do enquadramento do Fator R "
+                f"({exato:.2f}% → {anexo_calculado}); o card FAIXA e o "
+                "bloco Fator R devem indicar o mesmo Anexo."
+            )
+
+    # Exibição amigável: percentual inteiro, exceto se o arredondamento
+    # cruzar o limite de 28% e contradizer a decisão — nesse caso mantém
+    # uma casa decimal (a decisão III/V nunca muda pela apresentação).
+    inteiro = round(exato)
+    if (inteiro >= LIMIAR_FATOR_R) == (exato >= LIMIAR_FATOR_R):
+        exibicao = f"{inteiro:.0f}%"
+    else:
+        exibicao = percentual(exato, 1)
+
+    return {
+        "folha_12m": folha,
+        "faturamento_12m": faturamento,
+        "exibicao": exibicao,
+        "anexo": anexo_calculado,
+        "acima": exato >= LIMIAR_FATOR_R,
+    }
+
+
+def card_servico(c, x, y, w, h, titulo, valor, subtitulo=None, destaque=False):
+    """Card de indicador do layout de serviço (fundo neutro; o card do DAS
+    usa o tema vermelho suave do modelo)."""
+    fundo = VERMELHO_SUAVE if destaque else FUNDO_NEUTRO
+    borda = BORDA_VERMELHA if destaque else BORDA_NEUTRA
+    cor_valor = VERMELHO if destaque else PRETO
+    cor_sub = VERMELHO if destaque else CINZA
+
+    arredondar_caixa(c, x, y, w, h, fundo, borda, raio=7)
+
+    interno = w - 14
+
+    escrever_ajustado(
+        c, str(titulo).upper(), x + 7, y + h - 16, interno,
+        [8, 7.5, 7, 6.5], fonte=FONTE_BOLD, cor=CINZA, ancora="center",
+    )
+
+    escrever_ajustado(
+        c, texto_seguro(valor), x + 7, y + h / 2 - 8, interno,
+        [13, 12, 11, 10, 9], fonte=FONTE_BOLD, cor=cor_valor,
+        ancora="center",
+    )
+
+    if subtitulo:
+        escrever_ajustado(
+            c, texto_seguro(subtitulo), x + 7, y + 10, interno,
+            [7.5, 7, 6.5], fonte=FONTE, cor=cor_sub, ancora="center",
+        )
+
+
+def bloco_fator_r(c, x, y, w, h, fator):
+    """Bloco explicativo do Fator R (condicional — só é chamado quando
+    validar_fator_r devolve dados)."""
+    arredondar_caixa(c, x, y, w, h, AZUL_FATOR, BORDA_FATOR, raio=8)
+
+    escrever_ajustado(
+        c,
+        f"FATOR R — por que a empresa paga pelo {fator['anexo']}",
+        x + 12, y + h - 20, w - 24,
+        [11, 10.5, 10], fonte=FONTE_BOLD, cor=AZUL_MEDIO,
+    )
+
+    escrever_ajustado(
+        c,
+        "Fator R = Folha de salários dos últimos 12 meses ÷ "
+        "Faturamento dos últimos 12 meses",
+        x + 12, y + h - 35, w - 24,
+        [9, 8.5, 8], fonte=FONTE, cor=PRETO,
+    )
+
+    # Mini-cards: Folha (12m) · Faturamento (12m) · FATOR R
+    mini_h = 30
+    mini_y = y + h - 45 - mini_h
+    mini_gap = 8
+    mini_w = (w - 24 - mini_gap * 2) / 3
+
+    minis = [
+        ("Folha de salários (12 meses)", moeda(fator["folha_12m"]), PRETO),
+        ("Faturamento (12 meses)", moeda(fator["faturamento_12m"]), PRETO),
+        ("FATOR R", fator["exibicao"], AZUL_MEDIO),
+    ]
+
+    for indice, (rotulo, valor, cor_valor) in enumerate(minis):
+        mx = x + 12 + indice * (mini_w + mini_gap)
+        arredondar_caixa(c, mx, mini_y, mini_w, mini_h, BRANCO, BORDA_FATOR)
+        escrever_ajustado(
+            c, rotulo, mx + 5, mini_y + mini_h - 11, mini_w - 10,
+            [7.5, 7, 6.5], fonte=FONTE, cor=CINZA, ancora="center",
+        )
+        escrever_ajustado(
+            c, valor, mx + 5, mini_y + 6, mini_w - 10,
+            [10.5, 10, 9.5, 9], fonte=FONTE_BOLD, cor=cor_valor,
+            ancora="center",
+        )
+
+    if fator["acima"]:
+        linhas = [
+            f"Como o Fator R ficou em {fator['exibicao']} (igual ou acima "
+            "de 28%), a tributação segue o Anexo III — o mais vantajoso.",
+            "Abaixo de 28%, a empresa seria tributada pelo Anexo V, "
+            "com imposto maior.",
+        ]
+    else:
+        linhas = [
+            f"Como o Fator R ficou em {fator['exibicao']} (abaixo de 28%), "
+            "a tributação segue o Anexo V.",
+            "Ao atingir 28% ou mais, a atividade sujeita ao Fator R poderá "
+            "ser tributada pelo Anexo III.",
+        ]
+
+    linha_y = mini_y - 13
+    for linha in linhas:
+        escrever_ajustado(
+            c, linha, x + 12, linha_y, w - 24,
+            [8.5, 8, 7.5], fonte=FONTE, cor=PRETO,
+        )
+        linha_y -= 12
+
+
+def card_comparacao_servico(c, x, y, w, h, titulo, referencia, atual):
+    """Card verde de comparação de receita do layout de serviço."""
+    arredondar_caixa(c, x, y, w, h, VERDE_SUAVE, BORDA_VERDE, raio=8)
+
+    interno = w - 20
+
+    escrever_ajustado(
+        c, texto_seguro(titulo), x + 10, y + h - 16, interno,
+        [9.5, 9, 8.5, 8], fonte=FONTE_BOLD, cor=PRETO, ancora="center",
+    )
+
+    variacao, diferenca = calcular_variacao(atual, referencia)
+
+    if variacao is None:
+        escrever_ajustado(
+            c, "sem histórico comparável", x + 10, y + h / 2 - 8, interno,
+            [8.5, 8], fonte=FONTE, cor=CINZA, ancora="center",
+        )
+        return
+
+    escrever_ajustado(
+        c,
+        f"Receita de referência: {moeda(referencia)}",
+        x + 10, y + h - 31, interno,
+        [8.5, 8, 7.5], fonte=FONTE, cor=CINZA, ancora="center",
+    )
+
+    subiu = diferenca >= 0
+    cor = VERDE if subiu else VERMELHO
+    sinal = "+" if subiu else "-"
+    rotulo = f"{sinal}{percentual(abs(variacao), 1)}"
+
+    tamanho = 15
+    largura_rotulo = c.stringWidth(rotulo, FONTE_BOLD, tamanho)
+    meio_x = x + w / 2
+    tri = 10
+    inicio = meio_x - (largura_rotulo + tri + 6) / 2
+
+    base_y = y + 26
+    triangulo(c, inicio, base_y, tri, subiu, cor)
+
+    c.setFont(FONTE_BOLD, tamanho)
+    c.setFillColor(cor)
+    c.drawString(inicio + tri + 6, base_y, rotulo)
+
+    escrever_ajustado(
+        c,
+        f"{'Aumentou' if subiu else 'Diminuiu'} {moeda(abs(diferenca))}",
+        x + 10, y + 10, interno,
+        [9, 8.5, 8], fonte=FONTE, cor=cor, ancora="center",
+    )
+
+
+def linhas_dentro_das(impostos, municipio):
+    """Monta as linhas do bloco "Dentro do DAS deste mês" apenas com os
+    tributos efetivamente informados — nada é inventado ou zerado."""
+    linhas = []
+
+    partes = []
+    if impostos.get("iss") not in (None, ""):
+        texto = f"ISS de {moeda(impostos.get('iss'))}"
+        if municipio:
+            texto += f" destinado ao município de {municipio}"
+        partes.append(texto)
+    if impostos.get("cpp") not in (None, ""):
+        partes.append(f"INSS/CPP de {moeda(impostos.get('cpp'))}")
+    if partes:
+        linhas.append("   ·   ".join(partes))
+
+    federais = [
+        impostos.get(chave) for chave in ("irpj", "csll", "cofins", "pis")
+    ]
+    if any(valor not in (None, "") for valor in federais):
+        total = sum(float(valor or 0) for valor in federais)
+        linhas.append(
+            f"Tributos federais (IRPJ, CSLL, COFINS e PIS) de {moeda(total)}"
+        )
+
+    return linhas
+
+
+def gerar_pdf_servico(dados, arquivo_saida):
+    """Relatório Fiscal de empresa de SERVIÇO — layout do modelo oficial
+    modelo_relatorio_fiscal_servico.pdf.
+
+    Blocos, na ordem: cabeçalho centralizado com filete dourado; quatro
+    cards (Receita, Faixa/Anexo, Alíquota efetiva, DAS a pagar); bloco
+    FATOR R (condicional); comparação da receita; "Dentro do DAS deste
+    mês"; gráfico de receitas mensais; rodapé com data de geração.
+
+    Os blocos exclusivos do comércio (Compras, Resultado bruto, Margem,
+    Notas não lançadas, Principal/Multa/Juros e Comparativo de Vendas)
+    NÃO existem neste layout. Quando o Fator R não se aplica, o bloco é
+    omitido integralmente e os demais sobem — sem espaço reservado.
+    """
+    fator = validar_fator_r(dados)
+
+    c = canvas.Canvas(str(arquivo_saida), pagesize=A4)
+
+    largura, altura = A4
+    area_w = largura - MARGEM_SERV * 2
+
+    # ---------- CABEÇALHO ----------
+    y = altura - 58
+
+    centralizar(
+        c,
+        texto_seguro(
+            dados.get("competencia_extenso"),
+            dados.get("competencia", "-"),
+        ),
+        MARGEM_SERV, y, area_w,
+        fonte=FONTE_BOLD, tamanho=25, cor=PRETO,
+    )
+
+    nome_exibicao = texto_seguro(dados.get("nome_exibicao"), "")
+    razao = texto_seguro(dados.get("razao_social")).upper()
+    identificacao = f"{nome_exibicao} — {razao}" if nome_exibicao else razao
+
+    y -= 19
+    escrever_ajustado(
+        c,
+        f"{identificacao}   ·   Simples Nacional — Prestação de Serviços",
+        MARGEM_SERV, y, area_w,
+        [9.5, 9, 8.5, 8], fonte=FONTE, cor=CINZA, ancora="center",
+    )
+
+    y -= 13
+    c.setStrokeColor(DOURADO)
+    c.setLineWidth(1.6)
+    c.line(MARGEM_SERV, y, largura - MARGEM_SERV, y)
+    c.setLineWidth(1)
+
+    # ---------- QUATRO CARDS ----------
+    h_card = 64
+    gap = 8
+    card_w = (area_w - gap * 3) / 4
+
+    y -= 18 + h_card
+
+    faixa = texto_seguro(dados.get("faixa"))
+    anexo = texto_seguro(dados.get("anexo"), "")
+    valor_faixa = f"{faixa} — {anexo}" if anexo else faixa
+
+    cards = [
+        ("Receita do mês", moeda(dados.get("receita_mes")), None, False),
+        ("Faixa", valor_faixa,
+         texto_seguro(dados.get("limite_faixa"), ""), False),
+        ("Alíquota efetiva", percentual(dados.get("aliquota_efetiva")),
+         "sobre a receita do mês", False),
+        ("DAS a pagar", moeda(dados.get("das_total")),
+         f"vence em {texto_seguro(dados.get('vencimento_das'))}", True),
+    ]
+
+    for indice, (titulo, valor, sub, destaque) in enumerate(cards):
+        card_servico(
+            c, MARGEM_SERV + indice * (card_w + gap), y, card_w, h_card,
+            titulo, valor, sub, destaque,
+        )
+
+    # ---------- FATOR R (condicional) ----------
+    if fator is not None:
+        h_fator = 106
+        y -= 16 + h_fator
+        bloco_fator_r(c, MARGEM_SERV, y, area_w, h_fator, fator)
+
+    # ---------- COMPARAÇÃO DA RECEITA ----------
+    y -= 26
+    centralizar(
+        c, "COMPARAÇÃO DA RECEITA", MARGEM_SERV, y, area_w,
+        fonte=FONTE_BOLD, tamanho=11, cor=PRETO,
+    )
+
+    receita_atual = float(
+        dados.get("receita_mes") or dados.get("vendas") or 0
+    )
+
+    anterior = dados.get("comparativo_mes_anterior") or {}
+    anual = dados.get("comparativo_ano_anterior") or {}
+
+    competencia_anterior = texto_seguro(anterior.get("competencia"), "")
+    titulo_anterior = "Comparação com o mês anterior"
+    if competencia_anterior:
+        titulo_anterior += f" ({competencia_anterior})"
+
+    competencia_anual = texto_seguro(anual.get("competencia"), "")
+    titulo_anual = (
+        f"Comparação com {competencia_anual}"
+        if competencia_anual
+        else "Comparação com o mesmo mês do ano anterior"
+    )
+
+    h_comp = 78
+    meia_w = (area_w - gap) / 2
+    y -= 10 + h_comp
+
+    card_comparacao_servico(
+        c, MARGEM_SERV, y, meia_w, h_comp,
+        titulo_anterior, anterior.get("valor"), receita_atual,
+    )
+    card_comparacao_servico(
+        c, MARGEM_SERV + meia_w + gap, y, meia_w, h_comp,
+        titulo_anual, anual.get("valor"), receita_atual,
+    )
+
+    # ---------- DENTRO DO DAS DESTE MÊS ----------
+    impostos = dados.get("tributos") or {}
+    municipio = texto_seguro(dados.get("municipio_iss"), "")
+    linhas = linhas_dentro_das(impostos, municipio)
+
+    if linhas:
+        h_das = 24 + 13 * len(linhas)
+        y -= 14 + h_das
+        arredondar_caixa(
+            c, MARGEM_SERV, y, area_w, h_das,
+            FUNDO_NEUTRO, BORDA_NEUTRA, raio=8,
+        )
+
+        escrever_ajustado(
+            c, "Dentro do DAS deste mês:", MARGEM_SERV + 12,
+            y + h_das - 17, area_w - 24,
+            [10, 9.5], fonte=FONTE_BOLD, cor=PRETO,
+        )
+
+        linha_y = y + h_das - 31
+        for linha in linhas:
+            escrever_ajustado(
+                c, linha, MARGEM_SERV + 12, linha_y, area_w - 24,
+                [9, 8.5, 8], fonte=FONTE, cor=PRETO,
+            )
+            linha_y -= 13
+
+    # ---------- RECEITAS MENSAIS ----------
+    # O gráfico absorve o espaço restante (é assim que os blocos "sobem"
+    # quando o Fator R não existe), limitado a uma altura máxima.
+    rodape_topo = 64
+    h_grafico = min(y - 14 - (rodape_topo + 14), 330)
+
+    y -= 14 + h_grafico
+    desenhar_grafico_vendas(
+        c, MARGEM_SERV, y, area_w, h_grafico,
+        dados.get("historico_vendas", []),
+        titulo="RECEITAS MENSAIS",
+    )
+
+    # ---------- RODAPÉ ----------
+    c.setStrokeColor(DOURADO)
+    c.setLineWidth(1.2)
+    c.line(MARGEM_SERV, rodape_topo, largura - MARGEM_SERV, rodape_topo)
+    c.setLineWidth(1)
+
+    # A data vem do JSON (gerado_em); o relógio só é consultado na
+    # ausência do campo.
+    gerado_em = texto_seguro(
+        dados.get("gerado_em"), date.today().strftime("%d/%m/%Y")
+    )
+
+    escrever_ajustado(
+        c,
+        f"Gerado em {gerado_em}   ·   Base: memória fiscal do Grupo JB / "
+        "Simples Nacional   ·   "
+        f"Competência {texto_seguro(dados.get('competencia'))}",
+        MARGEM_SERV, rodape_topo - 18, area_w,
+        [9, 8.5, 8], fonte=FONTE_ITALICO, cor=CINZA, ancora="center",
+    )
+
+    c.save()
+
+
+# ============================================================
 # RELATÓRIO
 # ============================================================
 
 
 def gerar_pdf(dados, arquivo_saida):
+    # A natureza vem da planilha permanente (campo "natureza" do JSON) e
+    # define qual dos dois modelos será renderizado. Empresa de SERVIÇO usa
+    # o layout próprio (modelo_relatorio_fiscal_servico.pdf); todo o
+    # restante desta função é o layout histórico de COMÉRCIO, inalterado.
+    if natureza_empresa(dados) == "servico":
+        gerar_pdf_servico(dados, arquivo_saida)
+        return
+
     c = canvas.Canvas(str(arquivo_saida), pagesize=A4)
 
     largura, altura = A4
@@ -766,10 +1314,6 @@ def gerar_pdf(dados, arquivo_saida):
 
     card_w = (area_w - GAP_COLUNAS * 3) / 4
     meia_w = (area_w - GAP_COLUNAS) / 2
-
-    # A natureza vem da planilha permanente (campo "natureza" do JSON) e
-    # define qual dos dois layouts será renderizado.
-    servico = natureza_empresa(dados) == "servico"
 
     # ========================================================
     # CABEÇALHO
@@ -858,40 +1402,26 @@ def gerar_pdf(dados, arquivo_saida):
 
     vendas = float(dados.get("vendas") or dados.get("receita_mes") or 0)
 
-    if servico:
-        # EMPRESA DE SERVIÇO — seção 7A do SKILL.md.
-        #
-        # Compras, Resultado bruto e Margem são OMITIDOS integralmente: a
-        # coluna COMPRA da planilha não é lida, nenhum cálculo derivado de
-        # compras é feito e nada é substituído por zero ou por texto de
-        # preenchimento (nem mesmo "NÃO SE APLICA"). A linha é remontada
-        # apenas com os indicadores que existem de fato, ocupando toda a
-        # largura útil.
-        indicadores = [("Saídas (Vendas)", moeda(vendas))]
+    # EMPRESA DE COMÉRCIO — comportamento histórico, inalterado.
+    compras = float(dados.get("compras") or 0)
 
-        if dados.get("rbt12") not in (None, ""):
-            indicadores.append(("RBT12", moeda(dados.get("rbt12"))))
-    else:
-        # EMPRESA DE COMÉRCIO — comportamento histórico, inalterado.
-        compras = float(dados.get("compras") or 0)
+    resultado = dados.get("resultado_bruto")
+    if resultado is None:
+        resultado = vendas - compras
 
-        resultado = dados.get("resultado_bruto")
-        if resultado is None:
-            resultado = vendas - compras
+    # Metodologia do modelo oficial:
+    #   Resultado bruto = Vendas - Compras
+    #   Margem = Resultado bruto / Compras * 100
+    margem_pct = dados.get("margem")
+    if margem_pct is None and compras:
+        margem_pct = (float(resultado) / compras) * 100
 
-        # Metodologia do modelo oficial:
-        #   Resultado bruto = Vendas - Compras
-        #   Margem = Resultado bruto / Compras * 100
-        margem_pct = dados.get("margem")
-        if margem_pct is None and compras:
-            margem_pct = (float(resultado) / compras) * 100
-
-        indicadores = [
-            ("Entradas (Compras)", moeda(compras)),
-            ("Saídas (Vendas)", moeda(vendas)),
-            ("Resultado bruto", moeda(resultado)),
-            ("Margem", percentual(margem_pct, 0)),
-        ]
+    indicadores = [
+        ("Entradas (Compras)", moeda(compras)),
+        ("Saídas (Vendas)", moeda(vendas)),
+        ("Resultado bruto", moeda(resultado)),
+        ("Margem", percentual(margem_pct, 0)),
+    ]
 
     y -= GAP_CARDS + H_CARD
 
