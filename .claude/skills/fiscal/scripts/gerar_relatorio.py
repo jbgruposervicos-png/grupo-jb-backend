@@ -832,26 +832,40 @@ def validar_fator_r(dados):
         )
 
     # A metodologia oficial (seção 7C do SKILL.md) define que
-    # faturamento_12m É o RBT12 extraído do PGDAS: os dois campos devem
-    # coincidir, com tolerância apenas para arredondamento monetário
-    # (R$ 0,01). Divergência maior é erro — nunca escolher silenciosamente
-    # um dos dois valores.
+    # faturamento_12m É o RBT12 extraído do PGDAS. Por isso, com
+    # fator_r.aplicavel=true o campo rbt12 é OBRIGATÓRIO: sem o RBT12
+    # oficial o denominador do Fator R não tem origem comprovada, e o
+    # relatório não pode ser gerado apenas com fator_r.faturamento_12m.
     rbt12 = dados.get("rbt12")
-    if rbt12 not in (None, ""):
-        try:
-            rbt12 = float(rbt12)
-        except (TypeError, ValueError):
-            raise ValueError(f"rbt12 inválido (não numérico): {rbt12!r}")
+    if rbt12 in (None, ""):
+        raise ValueError(
+            "fator_r.aplicavel=true exige o campo rbt12 (RBT12 oficial "
+            "do PGDAS); sem ele o denominador do Fator R não tem origem "
+            "comprovada — sinalizar revisão manual."
+        )
 
-        # A diferença é arredondada a centavos antes da comparação, para
-        # que exatamente R$ 0,01 não seja rejeitado por ruído de ponto
-        # flutuante.
-        if round(abs(faturamento - rbt12), 2) > 0.01:
-            raise ValueError(
-                "Fator R inconsistente: faturamento_12m deve corresponder "
-                "ao RBT12 oficial do PGDAS "
-                f"(faturamento_12m={faturamento:.2f}, rbt12={rbt12:.2f})."
-            )
+    try:
+        rbt12 = float(rbt12)
+    except (TypeError, ValueError):
+        raise ValueError(f"rbt12 inválido (não numérico): {rbt12!r}")
+
+    if rbt12 <= 0:
+        raise ValueError(
+            "rbt12 (RBT12 oficial do PGDAS) zerado ou inválido: não é "
+            "possível calcular o Fator R — sinalizar revisão manual."
+        )
+
+    # Os dois campos devem coincidir, com tolerância apenas para
+    # arredondamento monetário (R$ 0,01) — a diferença é arredondada a
+    # centavos antes da comparação, para que exatamente R$ 0,01 não seja
+    # rejeitado por ruído de ponto flutuante. Divergência maior é erro —
+    # nunca escolher silenciosamente um dos dois valores.
+    if round(abs(faturamento - rbt12), 2) > 0.01:
+        raise ValueError(
+            "Fator R inconsistente: faturamento_12m deve corresponder "
+            "ao RBT12 oficial do PGDAS "
+            f"(faturamento_12m={faturamento:.2f}, rbt12={rbt12:.2f})."
+        )
 
     exato = (folha / faturamento) * 100
 

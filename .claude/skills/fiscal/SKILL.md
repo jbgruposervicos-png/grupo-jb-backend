@@ -823,7 +823,8 @@ Quando `fator_r.aplicavel = true`, o gerador oficial valida:
 
 - `folha_12m` presente e numérico;
 - `faturamento_12m` presente, numérico e maior que zero;
-- `faturamento_12m` igual ao campo `rbt12` (o RBT12 oficial do PGDAS), aceitando apenas diferença técnica de arredondamento monetário de no máximo R$ 0,01 — divergência maior gera erro claro, e o gerador nunca escolhe silenciosamente um dos dois valores;
+- `rbt12` OBRIGATÓRIO, numérico e maior que zero — rbt12 ausente, nulo, zerado ou inválido gera erro de validação; o relatório nunca é gerado usando apenas `fator_r.faturamento_12m`, pois a origem oficial do denominador é o RBT12 do PGDAS;
+- `faturamento_12m` igual ao campo `rbt12`, aceitando apenas diferença técnica de arredondamento monetário de no máximo R$ 0,01 — divergência maior gera erro claro, e o gerador nunca escolhe silenciosamente um dos dois valores;
 - `percentual` informado coerente com folha_12m / faturamento_12m;
 - `anexo_aplicado` informado coerente com o limite de 28%;
 - o campo `anexo` (card FAIXA) coerente com o enquadramento do Fator R: >= 28% deve resultar em Anexo III nos dois campos e < 28% em Anexo V nos dois campos — o PDF nunca pode mostrar um Anexo no card FAIXA e explicar outro no bloco Fator R.
