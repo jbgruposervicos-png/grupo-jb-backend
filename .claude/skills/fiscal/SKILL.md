@@ -32,17 +32,25 @@ Esta Skill possui recursos próprios, versionados no repositório.
 
 Eles são obrigatórios e não são opcionais.
 
-## R1. Modelo visual oficial
+## R1. Modelos visuais oficiais
 
-O modelo visual oficial do Relatório Fiscal é:
+Existem DOIS modelos visuais oficiais do Relatório Fiscal, escolhidos pela natureza da empresa registrada na planilha permanente (seção 7A):
+
+1. COMÉRCIO:
 
 `.claude/skills/fiscal/references/modelo-relatorio-fiscal.pdf`
 
-Esse arquivo define o layout aceito pelo Grupo JB: cabeçalho azul com logo JB, razão social e competência por extenso, duas linhas de cards de indicadores, cards de comparação, bloco de notas não lançadas, detalhamento do DAS, gráfico de vendas mensais, comparativo de vendas e rodapé.
+Esse arquivo define o layout aceito pelo Grupo JB para empresas de comércio: cabeçalho azul com logo JB, razão social e competência por extenso, duas linhas de cards de indicadores, cards de comparação, bloco de notas não lançadas, detalhamento do DAS, gráfico de vendas mensais, comparativo de vendas e rodapé.
 
-O relatório final deve seguir visualmente esse modelo o mais fielmente possível.
+2. SERVIÇO:
 
-Não redesenhar o relatório, não trocar a ordem dos blocos e não inventar um layout alternativo.
+`.claude/skills/fiscal/references/modelo_relatorio_fiscal_servico.pdf`
+
+Esse arquivo define o layout aceito pelo Grupo JB para empresas de serviço: cabeçalho centralizado com a competência por extenso, identificação da empresa e filete dourado; quatro cards (Receita do mês, Faixa com Anexo, Alíquota efetiva, DAS a pagar com vencimento); bloco FATOR R (condicional, ver seção 7C); comparação da receita (mês anterior e mesmo mês do ano anterior); bloco "Dentro do DAS deste mês"; gráfico de receitas mensais; rodapé com data de geração.
+
+O relatório final deve seguir visualmente o modelo correspondente o mais fielmente possível.
+
+Não redesenhar os relatórios, não trocar a ordem dos blocos e não inventar um layout alternativo.
 
 ## R2. Script oficial de geração
 
@@ -70,17 +78,19 @@ Nenhum outro dado pode entrar nesse arquivo.
 
 Campo sem origem comprovada nesses três documentos deve ficar ausente ou vazio, nunca preenchido por conveniência.
 
-## R4. Papel do arquivo de exemplo
+## R4. Papel dos arquivos de exemplo
 
-O arquivo:
+Os arquivos:
 
-`.claude/skills/fiscal/references/exemplo-dados.json`
+`.claude/skills/fiscal/references/exemplo-dados.json` (COMÉRCIO)
 
-é SOMENTE uma referência de ESTRUTURA dos dados esperados pelo gerador (nomes de chaves, tipos e formato dos blocos).
+`.claude/skills/fiscal/references/exemplo-dados-servico.json` (SERVIÇO)
 
-Nunca utilizar os valores desse arquivo em um processamento real.
+são SOMENTE referências de ESTRUTURA dos dados esperados pelo gerador (nomes de chaves, tipos e formato dos blocos), cada um para o seu layout.
 
-Os valores nele contidos (JB ITABOLOS PANIFICACAO E CONFEITARIA LTDA, competência 05/2026, receita, DAS, tributos, histórico de vendas, notas faltantes) são fictícios para efeito de demonstração.
+Nunca utilizar os valores desses arquivos em um processamento real.
+
+Os valores neles contidos (JB ITABOLOS PANIFICACAO E CONFEITARIA LTDA, competência 05/2026, receita, DAS, tributos, histórico de vendas, notas faltantes; CLINICA ODONTOLOGICA DE BUERAREMA LTDA, competência 07/2026, Fator R, folha e faturamento de 12 meses) são fictícios para efeito de demonstração.
 
 Em processamento real, todos os valores devem vir dos documentos reais (PGDAS e DAS) e da planilha permanente de controle fiscal.
 
@@ -136,7 +146,9 @@ Não alterar, sem instrução expressa do usuário:
 
 - `.claude/skills/fiscal/scripts/gerar_relatorio.py`;
 - `.claude/skills/fiscal/references/exemplo-dados.json`;
-- `.claude/skills/fiscal/references/modelo-relatorio-fiscal.pdf`;
+- `.claude/skills/fiscal/references/exemplo-dados-servico.json`;
+- `.claude/skills/fiscal/references/modelo-relatorio-fiscal.pdf` (modelo oficial de COMÉRCIO);
+- `.claude/skills/fiscal/references/modelo_relatorio_fiscal_servico.pdf` (modelo oficial de SERVIÇO);
 - `requirements.txt`.
 
 Todas as demais regras deste SKILL.md permanecem válidas e devem ser aplicadas em conjunto com esta seção.
@@ -349,6 +361,7 @@ Ao final da execução, produzir um resumo do lote, por empresa / CNPJ / compet�
 - PENDENTE — DUPLICIDADE DE PGDAS
 - PENDENTE — COMPETÊNCIA DIVERGENTE
 - PENDENTE — EMPRESA NÃO LOCALIZADA
+- PENDENTE — REVISÃO MANUAL (FATOR R)
 - ERRO DE GERAÇÃO
 - ERRO DE DISTRIBUIÇÃO
 - FORA DO ESCOPO DO RELATÓRIO — SEM PGDAS
@@ -572,7 +585,9 @@ O layout deve se reorganizar automaticamente para não deixar campos vazios nem 
 
 A ausência de compras não deve, por si só, classificar o relatório como incompleto.
 
-Todos os demais dados continuam normalmente: razão social, CNPJ, competência, receita, comparações de faturamento, RBT12, faixa e alíquota quando disponíveis, DAS, vencimento, composição tributária, histórico/gráfico, notas faltantes e as demais informações previstas nesta Skill.
+Todos os demais dados continuam normalmente: razão social, CNPJ, competência, receita, comparações de faturamento, RBT12, faixa, anexo e alíquota quando disponíveis, DAS, vencimento, composição tributária, histórico/gráfico e as demais informações previstas no modelo oficial de serviço (R1).
+
+O layout de SERVIÇO também NÃO exibe os blocos exclusivos do modelo de comércio: Notas não lançadas, Principal/Multa/Juros e Comparativo de Vendas horizontal. Pendências de notas faltantes continuam sendo verificadas na planilha (seção 8) e registradas no resumo do lote — apenas não aparecem no layout do relatório de serviço.
 
 ## Empresa de COMÉRCIO
 
@@ -591,7 +606,7 @@ E. GONZAGA EMPREENDIMENTOS LTDA é classificada como COMÉRCIO na planilha e dev
 
 ## Reflexo no gerador oficial
 
-O gerador oficial (R2) produz dois layouts e escolhe entre eles pelo campo `natureza` do JSON construído conforme R3.
+O gerador oficial (R2) produz dois layouts completos e escolhe entre eles pelo campo `natureza` do JSON construído conforme R3.
 
 O JSON deve conter obrigatoriamente:
 
@@ -602,16 +617,24 @@ exatamente conforme a classificação lida na planilha, nunca deduzida da ausên
 Comportamento do gerador:
 
 - natureza SERVIÇO
-  → linha de indicadores sem Compras, sem Resultado bruto e sem Margem, reorganizada automaticamente para ocupar a largura útil;
+  → caminho de renderização próprio (`gerar_pdf_servico`), seguindo o modelo oficial de serviço (R1): cabeçalho centralizado com filete dourado, quatro cards, bloco FATOR R condicional (seção 7C), comparação da receita, "Dentro do DAS deste mês", gráfico de receitas mensais e rodapé com data de geração. Sem Compras, sem Resultado bruto, sem Margem, sem Notas não lançadas, sem Principal/Multa/Juros e sem Comparativo de Vendas horizontal;
 
 - natureza COMÉRCIO
-  → layout completo, com Entradas (Compras), Saídas (Vendas), Resultado bruto e Margem.
+  → layout histórico completo e inalterado, com Entradas (Compras), Saídas (Vendas), Resultado bruto e Margem.
 
 Se o campo `natureza` estiver ausente, o gerador assume COMÉRCIO e mantém o layout completo.
 
 Por isso, para empresa de serviço, o campo `natureza` é obrigatório no JSON.
 
 Para empresa de serviço, não incluir o campo `compras` no JSON: o gerador ignora a coluna COMPRA nesse layout, e nenhum valor de compras deve ser transportado para o relatório.
+
+Campos próprios do JSON de serviço (estrutura completa em `exemplo-dados-servico.json`, conforme R4):
+
+- `nome_exibicao` — opcional; sigla/nome de exibição mostrado antes da razão social no cabeçalho. Se ausente, mostrar somente a razão social — nunca criar sigla ou nome fantasia;
+- `anexo` — anexo do Simples Nacional exibido no card FAIXA (ex.: "Anexo III"), extraído do PGDAS;
+- `fator_r` — objeto do bloco Fator R (seção 7C);
+- `municipio_iss` — opcional; município de destino do ISS no bloco "Dentro do DAS deste mês". Se ausente, mostrar o valor do ISS sem inventar município;
+- `gerado_em` — data de geração exibida no rodapé (DD/MM/AAAA). Quando presente, o gerador NÃO consulta o relógio.
 
 ## Competência como origem da consulta
 
@@ -697,6 +720,125 @@ XML/Notas + Outras Receitas = Receita Total
 Não tratar Outras Receitas como erro ou inconsistência.
 
 Não inventar valores de Cartão e Pix nem de Outras Receitas: se o campo não existir na planilha, não estimar — aplicar a regra apenas com os valores efetivamente encontrados.
+
+---
+
+# 7C. FATOR R — METODOLOGIA OFICIAL (EMPRESAS DE SERVIÇO)
+
+O bloco FATOR R do relatório de serviço explica por que a empresa é tributada pelo Anexo III ou pelo Anexo V do Simples Nacional.
+
+## Identificação de empresa sujeita ao Fator R
+
+A Routine deve usar os controles existentes da planilha permanente para identificar as empresas que possuem Fator R.
+
+Não considerar toda empresa de SERVIÇO automaticamente sujeita ao Fator R.
+
+Não deduzir "não se aplica" apenas porque um valor está vazio.
+
+Se houver ambiguidade sobre a aplicabilidade:
+
+- não inventar;
+- não inferir pela simples ausência de dados;
+- sinalizar REVISÃO MANUAL no resumo do lote e não afirmar enquadramento por Fator R no relatório.
+
+## Fonte da folha de salários
+
+A fonte oficial da folha para o Relatório Fiscal é a PLANILHA PERMANENTE.
+
+A planilha já possui campos mensais de folha destinados ao controle do Fator R.
+
+A Routine NÃO deve reconstruir a folha utilizando recibos, e-mails ou documentos de DP.
+
+## Folha de 12 meses (numerador)
+
+Somar os valores mensais de folha dos 12 meses ANTERIORES ao Período de Apuração analisado, conforme os campos da planilha permanente.
+
+Exemplo:
+
+PA 07/2026
+→ janela de referência: 07/2025 a 06/2026.
+
+## Regra operacional de alimentação da folha na planilha
+
+Regra de alimentação da base (não altera o uso no relatório):
+
+- a importação automática desses dados começa a partir de agosto;
+- na fonte de importação utilizada, o mês apresentado é um mês à frente;
+- portanto, quando a planilha de origem indicar setembro, o dado corresponde a agosto;
+- os meses anteriores ao início dessa implantação não devem ser alterados automaticamente;
+- alterações nesses meses somente manualmente.
+
+No Relatório Fiscal, usar os valores efetivamente armazenados na planilha permanente para a janela de 12 meses.
+
+## Faturamento de 12 meses (denominador)
+
+Usar o RBT12 oficial extraído do PGDAS para o mesmo PA.
+
+NÃO calcular o denominador pela soma das barras do gráfico.
+
+NÃO substituir o RBT12 do PGDAS pelo histórico visual de receitas.
+
+## Cálculo e regra de enquadramento
+
+fator_r = folha_12m / rbt12
+
+percentual = fator_r × 100
+
+Regra:
+
+- percentual >= 28% → Anexo III;
+- percentual < 28% → Anexo V.
+
+Para a comparação com 28%, usar o valor calculado SEM arredondamento visual.
+
+O valor exibido pode ser formatado de forma amigável, mas o arredondamento de apresentação não pode alterar a decisão III/V.
+
+Se o RBT12 for zero, ausente ou inválido:
+
+- não dividir;
+- não inventar percentual;
+- sinalizar revisão.
+
+## Contrato JSON do bloco Fator R
+
+O JSON de serviço carrega o objeto `fator_r`:
+
+```
+"fator_r": {
+  "aplicavel": true,
+  "folha_12m": ...,
+  "faturamento_12m": ...,
+  "percentual": ...,
+  "anexo_aplicado": "Anexo III"
+}
+```
+
+- `aplicavel: true` → o bloco é desenhado e exige `folha_12m` e `faturamento_12m` válidos;
+- `aplicavel: false` → o bloco NÃO é desenhado;
+- objeto ausente → o bloco NÃO é desenhado, mas a ausência do objeto NÃO é prova automática de "não aplicável" na etapa analítica da Routine — a aplicabilidade deve ser verificada na planilha (ver acima).
+
+## Consistência validada pelo gerador
+
+Quando `fator_r.aplicavel = true`, o gerador oficial valida:
+
+- `folha_12m` presente e numérico;
+- `faturamento_12m` presente, numérico e maior que zero;
+- `percentual` informado coerente com folha_12m / faturamento_12m;
+- `anexo_aplicado` informado coerente com o limite de 28%.
+
+Se houver inconsistência, o gerador gera erro de validação claro e NÃO produz um relatório com enquadramento contraditório.
+
+## Comportamento visual
+
+Empresa de serviço SEM Fator R (não sujeita, ou `aplicavel: false`):
+
+- omitir completamente o bloco;
+- não mostrar N/A;
+- não mostrar zero;
+- não reservar espaço vazio;
+- os blocos seguintes sobem automaticamente.
+
+Nunca afirmar enquadramento por Fator R quando a atividade não estiver identificada como sujeita a essa regra.
 
 ---
 
@@ -821,6 +963,8 @@ O relatório deve conter, conforme disponibilidade dos dados:
 Nunca preencher um campo com dado estimado apenas para completar o layout.
 
 Quando a planilha classificar a empresa como SERVIÇO, os campos de compras, resultado baseado em compras e margem baseada em compras são OMITIDOS do relatório, conforme a seção 7A — não aparecem com valor zerado, com NÃO SE APLICA nem com qualquer outro texto de preenchimento.
+
+Empresa de SERVIÇO segue o modelo oficial de serviço (R1), com os blocos descritos nas seções 7A e 7C — incluindo o bloco FATOR R quando aplicável e o bloco "Dentro do DAS deste mês" no lugar do detalhamento do DAS do comércio.
 
 ---
 

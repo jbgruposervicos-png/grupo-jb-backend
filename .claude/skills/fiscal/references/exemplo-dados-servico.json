@@ -1,0 +1,66 @@
+{
+  "natureza": "SERVICO",
+
+  "razao_social": "CLINICA ODONTOLOGICA DE BUERAREMA LTDA",
+  "nome_exibicao": "COB",
+  "competencia": "07/2026",
+  "competencia_extenso": "Julho / 2026",
+
+  "receita_mes": 33810.00,
+
+  "faixa": "2ª Faixa",
+  "limite_faixa": "R$ 180 mil a R$ 360 mil",
+  "anexo": "Anexo III",
+  "aliquota_efetiva": 7.87,
+
+  "das_total": 2662.04,
+  "vencimento_das": "20/08/2026",
+
+  "rbt12": 281380.64,
+
+  "fator_r": {
+    "aplicavel": true,
+    "folha_12m": 107416.24,
+    "faturamento_12m": 281380.64,
+    "percentual": 38.2,
+    "anexo_aplicado": "Anexo III"
+  },
+
+  "municipio_iss": "Buerarema/BA",
+
+  "tributos": {
+    "irpj": 132.45,
+    "csll": 101.23,
+    "cofins": 356.78,
+    "pis": 64.40,
+    "cpp": 1155.33,
+    "iss": 851.85
+  },
+
+  "comparativo_mes_anterior": {
+    "competencia": "Junho/2026",
+    "valor": 23450.64
+  },
+
+  "comparativo_ano_anterior": {
+    "competencia": "Julho/2025",
+    "valor": 23000.00
+  },
+
+  "historico_vendas": [
+    { "mes": "Ago/25", "valor": 9181.00 },
+    { "mes": "Set/25", "valor": 14050.00 },
+    { "mes": "Out/25", "valor": 21495.00 },
+    { "mes": "Nov/25", "valor": 37050.00 },
+    { "mes": "Dez/25", "valor": 28312.00 },
+    { "mes": "Jan/26", "valor": 14834.00 },
+    { "mes": "Fev/26", "valor": 24970.00 },
+    { "mes": "Mar/26", "valor": 29116.00 },
+    { "mes": "Abr/26", "valor": 22736.00 },
+    { "mes": "Mai/26", "valor": 33186.00 },
+    { "mes": "Jun/26", "valor": 23451.00 },
+    { "mes": "Jul/26", "valor": 33810.00, "atual": true }
+  ],
+
+  "gerado_em": "19/08/2026"
+}
