@@ -831,6 +831,28 @@ def validar_fator_r(dados):
             "possível calcular o Fator R — sinalizar revisão manual."
         )
 
+    # A metodologia oficial (seção 7C do SKILL.md) define que
+    # faturamento_12m É o RBT12 extraído do PGDAS: os dois campos devem
+    # coincidir, com tolerância apenas para arredondamento monetário
+    # (R$ 0,01). Divergência maior é erro — nunca escolher silenciosamente
+    # um dos dois valores.
+    rbt12 = dados.get("rbt12")
+    if rbt12 not in (None, ""):
+        try:
+            rbt12 = float(rbt12)
+        except (TypeError, ValueError):
+            raise ValueError(f"rbt12 inválido (não numérico): {rbt12!r}")
+
+        # A diferença é arredondada a centavos antes da comparação, para
+        # que exatamente R$ 0,01 não seja rejeitado por ruído de ponto
+        # flutuante.
+        if round(abs(faturamento - rbt12), 2) > 0.01:
+            raise ValueError(
+                "Fator R inconsistente: faturamento_12m deve corresponder "
+                "ao RBT12 oficial do PGDAS "
+                f"(faturamento_12m={faturamento:.2f}, rbt12={rbt12:.2f})."
+            )
+
     exato = (folha / faturamento) * 100
 
     informado = bruto.get("percentual")
@@ -854,6 +876,21 @@ def validar_fator_r(dados):
                 f"fator_r.anexo_aplicado ({anexo_informado}) contradiz o "
                 f"Fator R calculado de {exato:.2f}% "
                 f"(limite {LIMIAR_FATOR_R:.0f}% → {anexo_calculado})."
+            )
+
+    # O anexo do card FAIXA (campo "anexo") deve ser coerente com o
+    # enquadramento do Fator R: o PDF nunca pode mostrar um Anexo no card
+    # e explicar outro no bloco Fator R.
+    anexo_card = dados.get("anexo")
+    if anexo_card not in (None, ""):
+        if _normalizar_anexo(anexo_card) != _normalizar_anexo(
+            anexo_calculado
+        ):
+            raise ValueError(
+                f"Fator R inconsistente: o campo anexo ({anexo_card}) "
+                "diverge do enquadramento do Fator R "
+                f"({exato:.2f}% → {anexo_calculado}); o card FAIXA e o "
+                "bloco Fator R devem indicar o mesmo Anexo."
             )
 
     # Exibição amigável: percentual inteiro, exceto se o arredondamento
