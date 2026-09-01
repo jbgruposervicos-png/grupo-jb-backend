@@ -14,7 +14,8 @@ A Skill do DP é exclusivamente para:
 - identificar a competência;
 - identificar o tipo do documento;
 - renomear o PDF original;
-- distribuir o PDF para a pasta correta do cliente.
+- distribuir o PDF para a pasta correta do cliente;
+- após a distribuição validada, arquivar o original da fila em DP > PROCESSADOS > MM AAAA.
 
 Esta Skill NÃO deve:
 
@@ -36,6 +37,45 @@ Google Drive:
 > DP
 
 Todos os documentos do lote serão lidos a partir dessa pasta.
+
+Dentro dela poderá existir a pasta:
+
+**PROCESSADOS**
+
+Regras da fila:
+
+- a Routine deve analisar SOMENTE os documentos pendentes localizados diretamente na raiz da pasta DP;
+- nunca considerar arquivos existentes dentro de DP > PROCESSADOS como documentos pendentes;
+- não reprocessar arquivos arquivados em PROCESSADOS.
+
+### 2.1 ESTRUTURA DE PROCESSADOS
+
+Dentro de PROCESSADOS, os documentos devem ser separados por competência:
+
+```
+PROCESSADOS
+> MM AAAA
+```
+
+Exemplos:
+
+```
+PROCESSADOS
+> 07 2026
+
+PROCESSADOS
+> 08 2026
+
+PROCESSADOS
+> 09 2026
+```
+
+A Routine está autorizada a:
+
+- criar a pasta PROCESSADOS se ela ainda não existir;
+- criar a pasta MM AAAA dentro de PROCESSADOS quando necessário.
+
+Não criar estrutura por ano dentro de PROCESSADOS.
 
 ---
 
@@ -308,7 +348,8 @@ A distribuição deve preservar integralmente o PDF recebido.
 Permitido:
 
 - renomear;
-- copiar/enviar para o destino correto.
+- copiar/enviar para o destino correto;
+- mover o arquivo ORIGINAL da fila DP para DP > PROCESSADOS > MM AAAA, somente após a distribuição validada (ver seções 12.1 e 12.2).
 
 Não permitido:
 
@@ -329,7 +370,55 @@ A distribuição deve preferencialmente ser feita por **operação nativa de có
 
 - copiar o arquivo original para a pasta de competência correta;
 - o arquivo copiado deve receber o nome final definido pela Skill;
-- preservar o arquivo de origem intacto na pasta DP.
+- preservar o arquivo de origem intacto na pasta DP até a distribuição ser validada (ver seção 12.2).
+
+### 12.1 FLUXO OBRIGATÓRIO POR DOCUMENTO
+
+O fluxo obrigatório de cada documento é:
+
+1. identificar documento;
+2. identificar cliente;
+3. identificar competência;
+4. identificar tipo;
+5. determinar nome final;
+6. localizar destino;
+7. verificar duplicidade;
+8. copiar o PDF original para o destino correto do cliente;
+9. conferir a cópia;
+10. somente após a distribuição validada, mover o arquivo ORIGINAL da fila DP para:
+
+```
+DP
+> PROCESSADOS
+> MM AAAA
+```
+
+Exemplo:
+
+Documento de competência 07/2026
+→ DP > PROCESSADOS > 07 2026
+
+O arquivo movido para PROCESSADOS pode manter o nome original recebido na fila.
+
+Não é necessário renomear o arquivo arquivado em PROCESSADOS.
+
+### 12.2 VALIDAÇÃO ANTES DE ARQUIVAR
+
+Nunca mover o original para PROCESSADOS antes de confirmar que a distribuição terminou com sucesso.
+
+Quando uma nova cópia for criada:
+
+- confirmar que o arquivo existe no destino;
+- confirmar o nome final correto;
+- comparar o tamanho em bytes da origem e da cópia.
+
+Se os tamanhos forem diferentes:
+
+- considerar FALHA;
+- não mover o original;
+- manter o arquivo na pasta DP.
+
+Somente tamanho idêntico permite concluir DISTRIBUÍDO.
 
 Não permitido na implementação:
 
@@ -365,17 +454,51 @@ Nunca sobrescrever silenciosamente.
 
 Se existir exatamente o nome final:
 
+- NÃO sobrescrever;
 - não copiar por cima;
 - não substituir;
 - não criar "(1)", "cópia" ou variantes automáticas;
-- comparar a identificação disponível;
-- não criar duplicata automaticamente;
-- classificar como JÁ EXISTENTE;
-- manter o arquivo de entrada intacto até decisão humana.
+- não criar duplicata automaticamente.
+
+Antes de retirar o arquivo da fila, verificar se o arquivo existente é compatível com o documento da fila:
+
+- mesmo cliente/CPF/CNPJ;
+- mesma competência;
+- mesmo tipo;
+- mesmo tamanho em bytes, quando essa informação estiver disponível.
+
+Se houver confirmação suficiente de que é o mesmo documento:
+
+- classificar como **JÁ EXISTENTE CONFIRMADO**;
+- mover o original da fila para:
+  PROCESSADOS > MM AAAA.
+
+Se houver divergência de tamanho, conteúdo ou qualquer dúvida:
+
+- classificar como **REVISÃO MANUAL**;
+- manter o arquivo na pasta principal DP;
+- não mover para PROCESSADOS.
+
+Nunca assumir que dois arquivos são iguais apenas porque possuem o mesmo nome.
 
 Se não existir o nome final, o documento pode estar PRONTO PARA DISTRIBUIÇÃO, desde que todas as demais validações estejam satisfeitas.
 
 Não classificar automaticamente como REVISÃO MANUAL apenas porque existe um arquivo antigo com nomenclatura diferente.
+
+### 13.1 FALHA / REVISÃO MANUAL
+
+Arquivos classificados como:
+
+- FALHA
+- REVISÃO MANUAL
+
+devem permanecer diretamente em:
+
+Departamento Geral > DP
+
+Não mover esses documentos para PROCESSADOS.
+
+Assim eles continuam visíveis para conferência humana.
 
 ---
 
@@ -387,15 +510,21 @@ Não distribuir arquivo para um cliente apenas porque o nome é semelhante.
 
 Não criar CPF, CNPJ, competência ou tipo de documento que não estejam sustentados pelo documento.
 
-Nunca mover o arquivo original da pasta Departamento Geral > DP durante o processamento automático.
-
 A Routine faz distribuição por **cópia**.
 
-Não excluir automaticamente arquivos da pasta Departamento Geral > DP após a distribuição.
+Regras de movimentação do arquivo original:
 
-Não mover ou limpar a fila automaticamente.
+- nunca mover o original ANTES da distribuição;
+- nunca excluir automaticamente o original;
+- após DISTRIBUÍDO validado, mover o original para PROCESSADOS;
+- após JÁ EXISTENTE CONFIRMADO, mover o original para PROCESSADOS;
+- FALHA ou REVISÃO MANUAL permanecem na fila (raiz da pasta DP).
 
-Exclusão/limpeza da fila será sempre decisão humana posterior.
+PROCESSADOS é arquivo operacional, não lixeira.
+
+Nunca excluir automaticamente documentos de PROCESSADOS.
+
+Exclusão de documentos será sempre decisão humana posterior.
 
 ---
 
@@ -406,6 +535,16 @@ A Routine poderá processar vários documentos e vários clientes no mesmo lote.
 Cada documento deve ser tratado individualmente.
 
 Uma falha em um arquivo não deve impedir o processamento seguro dos demais.
+
+### 15.1 PROCESSAMENTO AGENDADO
+
+Nas execuções seguintes, ignorar integralmente a pasta PROCESSADOS.
+
+A quantidade de arquivos pendentes deve considerar somente os documentos diretamente na raiz da pasta DP.
+
+Se não houver documentos pendentes na raiz da pasta DP, encerrar informando:
+
+"DP: nenhuma pendência encontrada."
 
 ---
 
@@ -423,17 +562,22 @@ Ao final, informar para cada arquivo:
 - nome final;
 - situação:
   - DISTRIBUÍDO
-  - JÁ EXISTENTE
+  - JÁ EXISTENTE CONFIRMADO
   - REVISÃO MANUAL
   - FALHA
+- distribuído para;
+- arquivado em PROCESSADOS: SIM/NÃO;
+- pasta de PROCESSADOS, quando aplicável.
 
 Ao final apresentar totais:
 
-- arquivos analisados;
+- arquivos encontrados na fila;
 - distribuídos;
-- já existentes;
+- já existentes confirmados;
+- enviados para PROCESSADOS;
 - revisão manual;
-- falhas.
+- falhas;
+- arquivos que permaneceram pendentes na raiz DP.
 
 ---
 
