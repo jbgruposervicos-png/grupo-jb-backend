@@ -13,7 +13,7 @@ A Skill do DP é exclusivamente para:
 - identificar com segurança o cliente/empregador;
 - identificar a competência;
 - identificar o tipo do documento;
-- renomear o PDF original;
+- criar a cópia de distribuição com o nome final padronizado;
 - distribuir o PDF para a pasta correta do cliente;
 - após a distribuição validada, arquivar o original da fila em DP > PROCESSADOS > MM AAAA.
 
@@ -347,9 +347,17 @@ A distribuição deve preservar integralmente o PDF recebido.
 
 Permitido:
 
-- renomear;
+- criar a cópia de distribuição com o nome final padronizado (somente a CÓPIA destinada ao cliente recebe o nome final padronizado);
 - copiar/enviar para o destino correto;
 - mover o arquivo ORIGINAL da fila DP para DP > PROCESSADOS > MM AAAA, somente após a distribuição validada (ver seções 12.1 e 12.2).
+
+O arquivo ORIGINAL na pasta DP não deve ser renomeado.
+
+Depois da validação, o original é apenas movido para:
+
+DP > PROCESSADOS > MM AAAA
+
+O original arquivado em PROCESSADOS pode manter exatamente o nome recebido na fila.
 
 Não permitido:
 
@@ -369,8 +377,10 @@ Os documentos de origem já estão no Google Drive, na pasta Departamento Geral 
 A distribuição deve preferencialmente ser feita por **operação nativa de cópia** do próprio Google Drive/conector:
 
 - copiar o arquivo original para a pasta de competência correta;
-- o arquivo copiado deve receber o nome final definido pela Skill;
-- preservar o arquivo de origem intacto na pasta DP até a distribuição ser validada (ver seção 12.2).
+- o arquivo copiado deve receber o nome final definido pela Skill (somente a CÓPIA destinada ao cliente recebe o nome final padronizado);
+- não renomear o arquivo ORIGINAL na pasta DP;
+- preservar o arquivo de origem intacto na pasta DP até a distribuição ser validada (ver seção 12.2);
+- depois da validação, o original é apenas movido para DP > PROCESSADOS > MM AAAA, podendo manter exatamente o nome recebido na fila.
 
 ### 12.1 FLUXO OBRIGATÓRIO POR DOCUMENTO
 
