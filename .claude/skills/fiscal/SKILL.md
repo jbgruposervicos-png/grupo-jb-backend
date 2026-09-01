@@ -1328,3 +1328,298 @@ PGDAS = gatilho para a análise e para o Relatório Fiscal.
 DAS, DAE e outros documentos fiscais = documentos que podem ser distribuídos normalmente, mas não geram relatório por si só.
 
 Nenhuma regra já existente sobre cálculo, receitas, planilha permanente, geração do relatório ou destino dos arquivos é alterada por estas seções.
+
+---
+
+# METODOLOGIA OFICIAL DA PASTA PROCESSADOS
+
+As seções P1 a P13 acrescentam a metodologia oficial de arquivamento operacional PROCESSADOS ao Departamento Fiscal.
+
+Elas definem o ciclo de vida dos documentos ORIGINAIS da fila Fiscal APÓS a conclusão e validação do processamento previsto nesta Skill.
+
+Elas NÃO alteram nenhuma regra fiscal existente (ver P13).
+
+## P1. FILA OPERACIONAL
+
+A pasta de entrada é:
+
+++++++CONTABILIDADE+++
+> Departamento Geral
+> Fiscal
+
+Dentro dela poderá existir a subpasta:
+
+PROCESSADOS
+
+A Routine deve considerar como fila pendente SOMENTE os arquivos localizados diretamente na raiz da pasta Fiscal.
+
+Nunca tratar documentos dentro de:
+
+Fiscal > PROCESSADOS
+
+como documentos pendentes.
+
+Nunca reprocessar arquivos arquivados em PROCESSADOS.
+
+A planilha permanente de controle fiscal NÃO é documento de fila (L2): ela permanece sempre na raiz da pasta Fiscal e NUNCA deve ser movida para PROCESSADOS, mantendo integralmente as proteções da seção 5.
+
+## P2. ESTRUTURA DE PROCESSADOS
+
+Dentro de PROCESSADOS, organizar por competência:
+
+PROCESSADOS
+> MM AAAA
+
+Exemplos:
+
+PROCESSADOS
+> 07 2026
+
+PROCESSADOS
+> 08 2026
+
+PROCESSADOS
+> 09 2026
+
+A Routine está autorizada a criar:
+
+- a pasta PROCESSADOS, quando inexistente;
+- a pasta MM AAAA necessária.
+
+Não criar uma pasta intermediária por ano dentro de PROCESSADOS.
+
+A competência usada para nomear a pasta MM AAAA é a competência identificada no próprio documento, conforme as regras já existentes de identificação de competência.
+
+## P3. PRINCÍPIO DE SEGURANÇA
+
+PROCESSADOS é arquivo operacional, não lixeira.
+
+Nunca excluir automaticamente documentos da fila Fiscal ou de PROCESSADOS.
+
+Nunca mover um documento original para PROCESSADOS antes de concluir e validar todas as operações que dependem dele.
+
+O arquivo ORIGINAL não precisa ser renomeado quando for arquivado em PROCESSADOS.
+
+Somente a cópia destinada ao cliente recebe o nome final padronizado definido por esta Skill.
+
+Conciliação com as regras existentes:
+
+- PROCESSADOS é uma subpasta da própria pasta Fiscal; arquivar um original ali NÃO é excluí-lo nem movê-lo para fora da pasta Fiscal, portanto não viola a seção 20 nem a regra L13;
+- a proibição de L13 ("nunca mover DAS ou PGDAS para fora da pasta Fiscal durante o processamento") continua valendo integralmente: a movimentação para PROCESSADOS só ocorre DEPOIS que o processamento daquele documento estiver concluído e validado, e sempre dentro da própria pasta Fiscal;
+- a distribuição continua sendo feita por CÓPIA para o destino (seções 13 a 17); o que a metodologia PROCESSADOS acrescenta é apenas o arquivamento do ORIGINAL após a validação.
+
+## P4. DOCUMENTOS DE DISTRIBUIÇÃO SIMPLES
+
+Para documentos que não geram relatório analítico por si mesmos (Modalidade 1, seção 22.1), como:
+
+- DAE;
+- guias estaduais;
+- guias municipais;
+- ICMS;
+- ISS;
+- outros documentos fiscais de distribuição simples;
+
+o fluxo é:
+
+1. identificar contribuinte;
+2. identificar competência;
+3. identificar tipo;
+4. determinar nome final;
+5. localizar destino;
+6. verificar duplicidade;
+7. criar a cópia no destino correto;
+8. validar a cópia (P8);
+9. somente depois mover o ORIGINAL para:
+   Fiscal > PROCESSADOS > MM AAAA.
+
+Se a distribuição falhar ou houver dúvida:
+
+- manter o original na raiz da pasta Fiscal;
+- classificar como FALHA ou REVISÃO MANUAL (P9).
+
+## P5. PGDAS E PROCESSAMENTO ANALÍTICO
+
+PGDAS continua sendo o gatilho do processamento fiscal analítico conforme a metodologia atual desta Skill (L0 e seção 22.2).
+
+Quando houver PGDAS:
+
+NÃO mover o PGDAS para PROCESSADOS imediatamente após sua leitura.
+
+Antes de arquivar o PGDAS, concluir todas as etapas aplicáveis ao contribuinte e à competência, incluindo:
+
+- identificação do contribuinte;
+- identificação da competência;
+- associação segura dos documentos relacionados (seção 23);
+- leitura/apuração conforme a metodologia atual;
+- atualização da planilha permanente, quando aplicável;
+- geração do relatório fiscal, quando aplicável (R2, R7 e R8);
+- validação do relatório gerado;
+- distribuição dos documentos fiscais;
+- distribuição do relatório;
+- validação das cópias criadas (P8).
+
+Somente depois que o processamento analítico daquele contribuinte/competência estiver concluído e validado (incluindo a validação final da seção 19) poderá o PGDAS original ser movido para:
+
+Fiscal > PROCESSADOS > MM AAAA.
+
+## P6. DOCUMENTOS ASSOCIADOS AO PGDAS
+
+DAS, DAE e outros documentos associados ao mesmo contribuinte e competência devem respeitar sua participação no processamento.
+
+Quando o documento fizer parte do conjunto necessário ao processamento analítico:
+
+- não arquivá-lo antecipadamente;
+- mantê-lo disponível na raiz da pasta Fiscal até concluir o processamento daquele contribuinte/competência;
+- depois da validação completa, mover o original para PROCESSADOS > MM AAAA.
+
+Cada documento deve ser tratado individualmente no resultado final (P12).
+
+## P7. JÁ EXISTENTE
+
+Quando o nome final padronizado já existir no destino:
+
+- não sobrescrever;
+- não criar "(1)";
+- não criar "cópia";
+- não gerar variante automática.
+
+Antes de retirar o original da fila, confirmar que o arquivo existente no destino corresponde ao documento da fila.
+
+Usar, conforme disponibilidade:
+
+- mesmo contribuinte/CNPJ/CPF;
+- mesma competência;
+- mesmo tipo;
+- mesmo tamanho em bytes;
+- demais identificadores confiáveis disponíveis.
+
+Se houver confirmação suficiente:
+
+classificar como:
+
+JÁ EXISTENTE CONFIRMADO
+
+e mover o original para:
+
+Fiscal > PROCESSADOS > MM AAAA
+
+Se houver divergência ou dúvida:
+
+classificar como:
+
+REVISÃO MANUAL
+
+e manter o original na raiz de Fiscal.
+
+Nunca assumir igualdade apenas porque o nome é igual.
+
+Esta regra complementa — e não substitui — as proteções contra duplicidade já existentes (seções 18 e 25 e regras L9 e L10).
+
+## P8. VALIDAÇÃO DA CÓPIA
+
+Quando uma nova cópia for criada no destino:
+
+- confirmar que a cópia existe;
+- confirmar o nome final;
+- comparar o tamanho em bytes da origem e da cópia, quando a operação disponibilizar essa informação.
+
+Se houver divergência:
+
+- classificar como FALHA;
+- não arquivar o original;
+- manter o original na fila Fiscal.
+
+## P9. FALHA E REVISÃO MANUAL
+
+Documentos classificados como:
+
+- FALHA
+- REVISÃO MANUAL
+
+permanecem diretamente na raiz de:
+
+Departamento Geral > Fiscal
+
+Não mover para PROCESSADOS.
+
+Uma falha em um documento ou contribuinte não deve impedir o processamento seguro dos demais (mesmo princípio de isolamento de falhas de L7 e da seção 25).
+
+## P10. PROCESSAMENTO POR CONTRIBUINTE/COMPETÊNCIA
+
+Quando vários documentos estiverem relacionados ao mesmo contribuinte e competência, tratar esse conjunto como uma unidade lógica para as etapas analíticas (agrupamento CNPJ + COMPETÊNCIA de L5 e seção 23).
+
+Porém, registrar individualmente o resultado de cada arquivo.
+
+Não arquivar antecipadamente um documento que ainda possa ser necessário para concluir outra etapa segura daquele mesmo processamento.
+
+## P11. EXECUÇÕES FUTURAS
+
+Em novas execuções:
+
+- ignorar integralmente a pasta PROCESSADOS;
+- contar como pendentes somente os arquivos diretamente na raiz de Fiscal.
+
+Se não houver arquivos pendentes na raiz:
+
+encerrar informando:
+
+"FISCAL: nenhuma pendência encontrada."
+
+Não pesquisar dentro de PROCESSADOS para procurar trabalho novo.
+
+## P12. RESULTADO DO LOTE
+
+Para cada arquivo da fila informar:
+
+- arquivo original;
+- contribuinte;
+- competência;
+- tipo;
+- nome final de distribuição;
+- destino;
+- situação;
+- arquivado em PROCESSADOS: SIM/NÃO;
+- pasta de PROCESSADOS (MM AAAA), quando aplicável.
+
+Situações possíveis:
+
+- DISTRIBUÍDO
+- PROCESSAMENTO ANALÍTICO CONCLUÍDO
+- JÁ EXISTENTE CONFIRMADO
+- REVISÃO MANUAL
+- FALHA
+
+Ao final informar:
+
+- arquivos encontrados na fila;
+- contribuintes/competências processados;
+- relatórios gerados;
+- documentos distribuídos;
+- já existentes confirmados;
+- enviados para PROCESSADOS;
+- revisão manual;
+- falhas;
+- documentos que permaneceram pendentes na raiz Fiscal.
+
+Este resultado por arquivo complementa o resumo do lote por empresa/CNPJ/competência já definido em L14 — os estados de L14 continuam sendo usados para o processamento analítico; as situações acima registram o ciclo de vida de cada arquivo na fila e seu arquivamento em PROCESSADOS.
+
+## P13. NÃO ALTERAR A METODOLOGIA FISCAL
+
+As seções P1 a P12 apenas acrescentam a metodologia PROCESSADOS.
+
+Elas não mudam:
+
+- cálculo fiscal;
+- relatório;
+- PGDAS;
+- DAS;
+- DAE;
+- classificação serviço/comércio (seção 7A);
+- Fator R (seção 7C);
+- planilha permanente (seções 5, 6 e 7);
+- fontes de dados;
+- modelos de relatório (R1);
+- nomes de arquivos finais (seção 12 e L12);
+- destinos já definidos (seções 13 a 17).
+
+Em caso de aparente conflito, prevalece a leitura conciliada de P3: a metodologia fiscal existente rege TODO o processamento; a metodologia PROCESSADOS rege apenas o arquivamento do ORIGINAL dentro da própria pasta Fiscal, depois que o processamento estiver concluído e validado.
