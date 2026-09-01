@@ -1,6 +1,6 @@
 ---
 name: dp
-description: Organiza automaticamente os documentos do Departamento Pessoal do Grupo JB. Use quando houver documentos trabalhistas (recibos de pagamento, extratos, INSS, FGTS, férias, rescisões e outros) na pasta Departamento Geral/DP para identificar o cliente/empregador, a competência e o tipo do documento, renomear o PDF e distribuí-lo para a pasta correta do cliente no Google Drive (EMPRESAS, FAZENDAS ou EMPREGADA DOMESTICA), sem alterar o conteúdo dos arquivos.
+description: Organiza automaticamente os documentos do Departamento Pessoal do Grupo JB. Use quando houver documentos trabalhistas (recibos de pagamento, extratos, INSS, FGTS, férias, rescisões e outros) na pasta Departamento Geral/DP para identificar o cliente/empregador, a competência e o tipo do documento, criar uma cópia de distribuição com nome final padronizado na pasta correta do cliente no Google Drive (EMPRESAS, FAZENDAS ou EMPREGADA DOMESTICA), preservando o nome do arquivo original na fila e, após distribuição validada ou JÁ EXISTENTE CONFIRMADO, movendo o original para DP > PROCESSADOS > MM AAAA, sem alterar o conteúdo dos arquivos.
 ---
 
 # DEPARTAMENTO PESSOAL — GRUPO JB
