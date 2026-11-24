@@ -1402,26 +1402,36 @@ def gerar_pdf(dados, arquivo_saida):
 
     vendas = float(dados.get("vendas") or dados.get("receita_mes") or 0)
 
-    # EMPRESA DE COMÉRCIO — comportamento histórico, inalterado.
-    compras = float(dados.get("compras") or 0)
+    # `omitir_compras`: exceção autorizada pelo usuário à seção 7A-COMÉRCIO
+    # quando a planilha não tem o valor de compras da competência. Os campos
+    # baseados em compras são OMITIDOS — nunca substituídos por R$ 0,00 nem
+    # calculados como Receita - 0. A natureza do JSON segue a da planilha.
+    if dados.get("omitir_compras"):
+        indicadores = [("Saídas (Vendas)", moeda(vendas))]
 
-    resultado = dados.get("resultado_bruto")
-    if resultado is None:
-        resultado = vendas - compras
+        if dados.get("rbt12") not in (None, ""):
+            indicadores.append(("RBT12", moeda(dados.get("rbt12"))))
+    else:
+        # EMPRESA DE COMÉRCIO — comportamento histórico, inalterado.
+        compras = float(dados.get("compras") or 0)
 
-    # Metodologia do modelo oficial:
-    #   Resultado bruto = Vendas - Compras
-    #   Margem = Resultado bruto / Compras * 100
-    margem_pct = dados.get("margem")
-    if margem_pct is None and compras:
-        margem_pct = (float(resultado) / compras) * 100
+        resultado = dados.get("resultado_bruto")
+        if resultado is None:
+            resultado = vendas - compras
 
-    indicadores = [
-        ("Entradas (Compras)", moeda(compras)),
-        ("Saídas (Vendas)", moeda(vendas)),
-        ("Resultado bruto", moeda(resultado)),
-        ("Margem", percentual(margem_pct, 0)),
-    ]
+        # Metodologia do modelo oficial:
+        #   Resultado bruto = Vendas - Compras
+        #   Margem = Resultado bruto / Compras * 100
+        margem_pct = dados.get("margem")
+        if margem_pct is None and compras:
+            margem_pct = (float(resultado) / compras) * 100
+
+        indicadores = [
+            ("Entradas (Compras)", moeda(compras)),
+            ("Saídas (Vendas)", moeda(vendas)),
+            ("Resultado bruto", moeda(resultado)),
+            ("Margem", percentual(margem_pct, 0)),
+        ]
 
     y -= GAP_CARDS + H_CARD
 
